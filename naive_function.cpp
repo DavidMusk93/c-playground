@@ -14,19 +14,20 @@ class naive_function<ReturnType(Args...)> {
 public:
     template<typename T>
     naive_function &operator=(T &&t) {
-        is_small_object_ = sizeof(CallableT<T>) <= sizeof(buffer);
-        callable_ = is_small_object_
-                    ? new(buffer)CallableT<T>(std::forward<T>(t))
-                    : new CallableT<T>(std::forward<T>(t));
+        release_();
+        using value_type = CallableT<T>;
+        if (sizeof(value_type) <= sizeof(buffer_)) {
+            callable_ = new(buffer_)value_type(std::forward<T>(t));
+        } else {
+            callable_ = new value_type(std::forward<T>(t));
+        }
         return *this;
     }
 
-    explicit naive_function() : callable_(nullptr), is_small_object_(false) {}
+    explicit naive_function() : callable_(nullptr) {}
 
     ~naive_function() {
-        if (!is_small_object_) {
-            delete (callable_);
-        }
+        release_();
     }
 
     ReturnType operator()(Args &&... args) const {
@@ -57,9 +58,14 @@ private:
         T t_;
     };
 
+    void release_() {
+        if (callable_ && (void *) callable_ != (void *) buffer_) {
+            delete callable_;
+        }
+    }
+
     ICallable *callable_;
-    char buffer[16] = {};
-    bool is_small_object_;
+    char buffer_[16] = {};
 };
 
 void func() {
