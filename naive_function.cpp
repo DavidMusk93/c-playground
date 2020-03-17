@@ -78,6 +78,7 @@ struct functor {
     }
 };
 
+#ifdef NAIVE_FUNCTION_TEST
 int main() {
     naive_function<void()> f;
     f = func;
@@ -87,3 +88,4 @@ int main() {
     f = []() { std::cout << "lambda" << std::endl; };
     f();
 }
+#endif
