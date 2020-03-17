@@ -96,6 +96,7 @@ public:
     }
 };
 
+#ifdef STRING_BUILDER_TEST
 int main() {
     // 8-bit characters
     StringBuilder<char> ansi;
@@ -117,3 +118,4 @@ int main() {
     std::wcout << wide.Join(L" _\n") << std::endl;
     return 0;
 }
+#endif
