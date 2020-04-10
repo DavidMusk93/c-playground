@@ -3,4 +3,6 @@ project(cpp4fun)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(cpp4fun naive_function.cpp StringBuilder.cpp meta-programming/enable_if.cpp)
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} SOURCE_FILES)
+
+add_executable(cpp4fun ${SOURCE_FILES} virtual-dispatcher.cpp)
