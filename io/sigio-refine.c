@@ -14,6 +14,8 @@
 #include "macro.h"
 #include "utility.h"
 
+#ifdef TEST_SIGIO_REFINE
+
 MAIN() {
     int flags;
     struct termios ori;
@@ -42,3 +44,5 @@ MAIN() {
     ERROR_EXIT(tcsetattr(STDIN_FILENO, TCSAFLUSH, &ori) == -1, "tcsetattr");
     return 0;
 }
+
+#endif

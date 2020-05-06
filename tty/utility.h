@@ -7,6 +7,8 @@
 
 #include <termios.h>
 
-int tty_set_char_break(int fd, struct termios *old);
+int tty_set_char_break(int fd, struct termios *pre);
+
+int tty_set_raw(int fd, struct termios *pre);
 
 #endif //C4FUN_UTILITY_H
