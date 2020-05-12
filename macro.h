@@ -25,4 +25,6 @@ if(error){\
     exit(EXIT_FAILURE);\
 }
 
+#define log(fmt, ...) printf(fmt "\n",##__VA_ARGS__)
+
 #endif //C4FUN_MACRO_H
