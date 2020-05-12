@@ -12,6 +12,8 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <sys/signalfd.h>
+#include <assert.h>
 
 #define BUF_SIZE 256
 
@@ -26,6 +28,14 @@ static void child_handler(int sig) {
         return;
     }
     fprintf(stdout, "%s script end\r\n", DEFAULT_TIME_FORMAT(now(0)));
+}
+
+static void sigwinch_handler(int sig) {
+    struct winsize ws;
+    if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) != -1) {
+        printf("Caught SINWINCH, new window size: "
+               "%d row * %d columns\r\n", ws.ws_row, ws.ws_col);
+    }
 }
 
 static void tty_reset(void) {
@@ -54,6 +64,15 @@ MAIN_EX(argc, argv) {
     sa.sa_flags = 0;
     sa.sa_handler = &child_handler;
     sigaction(SIGCHLD, &sa, 0); /* avoid zombie */
+
+    /* set SIGWINCH handler */
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGWINCH);
+    int sig_fd = signalfd(-1, &mask, SFD_CLOEXEC | SFD_NONBLOCK);
+    ERROR_EXIT(sig_fd == -1, "signalfd");
+    sigprocmask(SIG_BLOCK, &mask, 0);
+
     ERROR_EXIT(tcgetattr(STDIN_FILENO, &ori) == -1, "tcgetattr");
     ERROR_EXIT(ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) < 0, "ioctl(TIOCGWINSZ)");
     ERROR_EXIT((child = pty_fork(&master_fd, sn, MAX_SNAME, &ori, &ws)) == -1, "pty_fork");
@@ -63,20 +82,22 @@ MAIN_EX(argc, argv) {
             shell = "/bin/bash";
         }
         fprintf(stdout, "%s script start\n", DEFAULT_TIME_FORMAT(now(0)));
+        /*signal(SIGWINCH, &sigwinch_handler);*/
         execlp(shell, shell, (char *) 0);
         ERROR_EXIT(1, "execlp");
     }
-    script_fd = open(argc > 1 ? argv[1] : "typescript", O_WRONLY | O_CREAT | O_TRUNC, 0777);
+    script_fd = open(argc > 1 ? argv[1] : "typescript", O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0777);
     ERROR_EXIT(script_fd == -1, "open typescript");
     tty_set_raw(STDIN_FILENO, &ori);
     ERROR_EXIT(atexit(tty_reset) != 0, "atexit");
     for (;;) {
-        struct sigaction sa = {};
-
         FD_ZERO(&in_fds);
         FD_SET(STDIN_FILENO, &in_fds);
         FD_SET(master_fd, &in_fds);
-        ERROR_EXIT(select(master_fd + 1, &in_fds, 0, 0, 0) == -1, "select");
+        FD_SET(sig_fd, &in_fds);
+        struct signalfd_siginfo si;
+        int max_fd = master_fd > sig_fd ? master_fd : sig_fd;
+        ERROR_EXIT(select(max_fd + 1, &in_fds, 0, 0, 0) == -1, "select");
         if (FD_ISSET(STDIN_FILENO, &in_fds)) {
             num_read = read(STDIN_FILENO, buf, BUF_SIZE);
             if (num_read <= 0) {
@@ -95,6 +116,11 @@ MAIN_EX(argc, argv) {
             }
             WRITE(STDOUT_FILENO, buf, num_read);
             WRITE(script_fd, buf, num_read);
+        }
+        if (FD_ISSET(sig_fd, &in_fds)) {
+            read(sig_fd, &si, sizeof si);
+            assert(si.ssi_signo == SIGWINCH);
+            sigwinch_handler(si.ssi_signo);
         }
     }
     return 0;
