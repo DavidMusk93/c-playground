@@ -6,7 +6,6 @@
 
 #include <stdio.h>
 #include <time.h>
-#include <sys/time.h>
 
 #define LOG(fmt, ...) printf(fmt"\n",##__VA_ARGS__)
 
