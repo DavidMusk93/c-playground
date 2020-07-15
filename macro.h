@@ -11,7 +11,7 @@
 int main()
 
 #define MAIN_EX(argc, argv) \
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 
 #define WHERE_FALSE while(0)
 

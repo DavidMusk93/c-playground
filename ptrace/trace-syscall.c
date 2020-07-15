@@ -3,16 +3,7 @@
 // @ref https://www.linuxjournal.com/article/6100
 //
 
-#include <sys/ptrace.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <sys/user.h>
-#include <assert.h>
-
-#include "macro.h"
-
-#define USER_REGS_OFF(x) (&((struct user_regs_struct*)0)->x)
+#include "common.h"
 
 MAIN() {
     pid_t child;

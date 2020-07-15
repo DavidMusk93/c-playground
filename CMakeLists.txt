@@ -18,6 +18,7 @@ aux_source_directory(class CLASS_SRC)
 aux_source_directory(ptrace PTRACE_SRC)
 aux_source_directory(builtin BUILTIN_SRC)
 aux_source_directory(process PROCESS_SRC)
+aux_source_directory(gcc GCC_SRC)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tty)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -28,4 +29,4 @@ add_executable(${my_project}
         ${TTY_SRC} ${IO_SRC} ${PTY_SRC} ${MULTICAST_SRC}
         ${CRC_SRC} ${TIME_SRC} ${TRIVIAL_SRC} ${CLASS_SRC}
         ${NUM_SRC} ${CONTAINER_SRC} ${ALGORITHM_SRC} ${PTRACE_SRC}
-        ${BUILTIN_SRC} ${PROCESS_SRC})
+        ${BUILTIN_SRC} ${PROCESS_SRC} ${GCC_SRC})
