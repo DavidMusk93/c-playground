@@ -45,4 +45,6 @@ if(error){\
 #define log(fmt, ...) printf(fmt "\n",##__VA_ARGS__)
 #define LOG log
 
+#define dimension_of(x) (sizeof(x)/sizeof(*x))
+
 #endif //C4FUN_MACRO_H
