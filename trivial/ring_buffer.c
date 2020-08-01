@@ -17,7 +17,7 @@ struct ring_buffer_t{
 #define RING struct ring_buffer_t
 
 void ring_buffer_init(RING*self,size_t capacity,size_t block){
-#define ALIGN(x) (((x)&~7U)+8U)
+#define ALIGN(x) (((x)&~7U)+((x)&7U)?8U:0)
     self->blob=malloc(capacity*(sizeof(void*)+ALIGN(block)));
     self->data=self->blob;
     char *p=(char*)self->blob+capacity*sizeof(void*);

@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-set(my_project c4fun)
-
-project(${my_project})
+project(c4fun)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/tty TTY_SRC)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/io IO_SRC)
@@ -25,8 +23,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(${my_project}
+add_executable(${PROJECT_NAME}
         ${TTY_SRC} ${IO_SRC} ${PTY_SRC} ${MULTICAST_SRC}
         ${CRC_SRC} ${TIME_SRC} ${TRIVIAL_SRC} ${CLASS_SRC}
         ${NUM_SRC} ${CONTAINER_SRC} ${ALGORITHM_SRC} ${PTRACE_SRC}
         ${BUILTIN_SRC} ${PROCESS_SRC} ${GCC_SRC})
+
+target_link_libraries(${PROJECT_NAME} pthread)
