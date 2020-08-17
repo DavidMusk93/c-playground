@@ -18,6 +18,7 @@ aux_source_directory(builtin BUILTIN_SRC)
 aux_source_directory(process PROCESS_SRC)
 aux_source_directory(gcc GCC_SRC)
 aux_source_directory(structure STRUCTURE_SRC)
+aux_source_directory(socket SOCKET_SRC)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tty)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -28,6 +29,7 @@ add_executable(${PROJECT_NAME}
         ${TTY_SRC} ${IO_SRC} ${PTY_SRC} ${MULTICAST_SRC}
         ${CRC_SRC} ${TIME_SRC} ${TRIVIAL_SRC} ${CLASS_SRC}
         ${NUM_SRC} ${CONTAINER_SRC} ${ALGORITHM_SRC} ${PTRACE_SRC}
-        ${BUILTIN_SRC} ${PROCESS_SRC} ${GCC_SRC} ${STRUCTURE_SRC})
+        ${BUILTIN_SRC} ${PROCESS_SRC} ${GCC_SRC} ${STRUCTURE_SRC}
+        ${SOCKET_SRC})
 
 target_link_libraries(${PROJECT_NAME} pthread)
