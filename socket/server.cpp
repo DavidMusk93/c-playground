@@ -59,12 +59,14 @@ void Server::run() {
                         if(new_connection_){
                             auto connection=new_connection_;
                             ERROR_RETURN(new_connection_->epollRegister(epoll_handler,EPOLLIN|EPOLLET|EPOLLRDHUP)==-1,,,0);
-                            new_connection_->registerCallback({[](int fd,void*user_data){
-                                struct sockaddr_in peer{};
-                                socklen_t len=sizeof(peer);
+                            auto p=connection.get();
+                            new_connection_->registerCallback({[p](int fd,void*user_data){
+//                                struct sockaddr_in peer{};
+//                                socklen_t len=sizeof(peer);
                                 char buf[1024];
-                                int nr=recvfrom(fd,buf,sizeof(buf),0,(struct sockaddr*)&peer,&len);
-                                LOG("received '%.*s' from " SOCKADDR_FMT,nr,buf,SOCKADDR_OF(peer));
+//                                int nr=recvfrom(fd,buf,sizeof(buf),0,(struct sockaddr*)&peer,&len);
+                                int nr=recv(fd,buf,sizeof(buf),0);
+                                LOG("(%p)received '%.*s'",p,nr,buf);
                             }
                             ,nullptr
                             ,[connection,this](int&fd){
