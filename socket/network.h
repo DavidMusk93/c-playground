@@ -24,6 +24,8 @@
 #include <poll.h>
 #include <fcntl.h>
 
+//#include "time/now.h"
+
 #define LOG(fmt,...) printf(fmt "\n",##__VA_ARGS__)
 #define WHERE_FALSE while(0)
 
@@ -41,6 +43,8 @@ do{\
 ERROR_RETURN(setsockopt(sock,level,name,&val,sizeof(val))!=0,code,{close(sock);sock=-1;},true)
 
 #define SOCKADDR_EX(x) (struct sockaddr*)&x,sizeof(x)
+#define SOCKADDR_FMT "%s:%d"
+#define SOCKADDR_OF(x) inet_ntoa((x).sin_addr),ntohs((x).sin_port)
 
 #define MAKE_SOCKADDR_IN(name,addr,port) \
 struct sockaddr_in name{};\

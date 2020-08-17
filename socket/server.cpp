@@ -46,7 +46,7 @@ void Server::run() {
     for(;;){
         ERROR_RETURN((nfds=epoll_wait(epoll_handler,events,MAX_EVENTS,TIMEOUT))==-1,,,1);
         if(nfds==0){
-            LOG("epoll timeout");
+            LOG("epoll timeout,interest list size: %d",(int)connections_.size());
         }
         for(int i=0;i<nfds;++i){
             const auto&fd=events[i].data.fd;
@@ -61,16 +61,15 @@ void Server::run() {
                             ERROR_RETURN(new_connection_->epollRegister(epoll_handler,EPOLLIN|EPOLLET|EPOLLRDHUP)==-1,,,0);
                             new_connection_->registerCallback({[](int fd,void*user_data){
                                 struct sockaddr_in peer{};
-                                socklen_t len{};
+                                socklen_t len=sizeof(peer);
                                 char buf[1024];
                                 int nr=recvfrom(fd,buf,sizeof(buf),0,(struct sockaddr*)&peer,&len);
-                                LOG("received '%*s' from %s:%d",nr,buf,inet_ntoa(peer.sin_addr),ntohs(peer.sin_port));
+                                LOG("received '%.*s' from " SOCKADDR_FMT,nr,buf,SOCKADDR_OF(peer));
                             }
                             ,nullptr
                             ,[connection,this](int&fd){
                                 LOG("(%p) connection closed",connection.get());
                                 connections_.erase(connection);
-                                Connection::Cleanup(fd);
                             }},nullptr);
                             connections_.emplace(std::move(new_connection_));
                         }
@@ -87,16 +86,29 @@ void Server::run() {
 void Server::Accept(int server_fd, void *user_data) {
     auto server=reinterpret_cast<Server*>(user_data);
     struct sockaddr_in peer{};
-    socklen_t len{};
+    socklen_t len=sizeof(peer);
     int fd;
     ERROR_RETURN((fd=accept4(server_fd,(struct sockaddr*)&peer,&len,O_NONBLOCK))==-1,,,1);
-    LOG("new connection: %d",fd);
     server->new_connection_=std::make_shared<Connection>(fd);
+    LOG("(%p)new connection from " SOCKADDR_FMT,server->new_connection_.get(),SOCKADDR_OF(peer));
 //    server->connections_.insert(std::make_shared<Connection>(fd));
 }
 
-int main(){
+int main(int argc,char*argv[]){
+#define PORT_BASE 10000
+    short port;
+    if(argc==1){
+        port=PORT_BASE+2;
+    }else{
+        long t=strtol(argv[1],nullptr,10);
+        if(t>PORT_BASE){
+            t%=PORT_BASE;
+        }
+        port=PORT_BASE+t;
+    }
     Terminator terminator;
-    Server server(Server::Type::TCP,Server::Config{.port=10002,.backlog=1},terminator);
+    LOG("bind server to 0.0.0.0:%d",port);
+    Server server(Server::Type::TCP,Server::Config{.port=port,.backlog=1},terminator);
     pause();
+#undef PORT_BASE
 }
