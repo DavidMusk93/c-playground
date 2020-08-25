@@ -13,10 +13,11 @@ Group::Group(std::string ip, short port):ip_(std::move(ip)),port_(port),fd_(-1){
     SETSOCKOPT(fd,SOL_SOCKET,SO_REUSEPORT,ON,);
     MAKE_SOCKADDR_IN(local,INADDR_ANY,htons(port_));
     ERROR_RETURN(bind(fd,SOCKADDR_EX(local))==-1,,,1);
-    LOG("(GROUP)join to %s:%d",ip.c_str(),port);
+    LOG("(GROUP)join to %s:%d",ip_.c_str(),port);
+    fd_=fd;
+    cleaner=Cleaner{[this]{FdHelper::Close(fd_);}};
     ERROR_RETURN(Join(inet_addr(ip_.c_str()),INADDR_ANY)==false,,,0);
     cleaner.cancel();
-    fd_=fd;
 }
 
 bool Group::Join(const in_addr_t group, const in_addr_t recv) {
