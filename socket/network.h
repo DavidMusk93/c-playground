@@ -68,6 +68,13 @@ public:
         return size;
     }
 
+    static void Close(int&fd){
+        if(fd!=-1){
+            close(fd);
+            fd=-1;
+        }
+    }
+
 public:
     static constexpr int kPipeRead=0;
     static constexpr int kPipeWrite=1;
@@ -107,6 +114,10 @@ using Closure=std::function<void()>;
 class Cleaner{
 public:
     Cleaner(Closure closure):final_(std::move(closure)){}
+    Cleaner&operator=(Cleaner&&cleaner)noexcept{
+        final_.swap(cleaner.final_);
+        return *this;
+    }
     ~Cleaner(){
         if(final_){
             final_();
@@ -183,6 +194,25 @@ private:
     Terminator&terminator_;
     std::unordered_set<Connection::Handler> connections_;
     Connection::Handler new_connection_;
+};
+
+class Group{
+public:
+    Group(std::string ip,short port);
+//    ~Group(){
+//        FdHelper::Close(fd_);
+//    }
+    [[nodiscard]] int fd() const{
+        return fd_;
+    }
+
+protected:
+    bool Join(in_addr_t group,in_addr_t recv);
+
+private:
+    std::string ip_;
+    short port_;
+    int fd_;
 };
 
 #endif //C4FUN_NETWORK_H

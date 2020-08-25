@@ -47,4 +47,6 @@ if(error){\
 
 #define dimension_of(x) (sizeof(x)/sizeof(*x))
 
+#define NL '\n'
+
 #endif //C4FUN_MACRO_H

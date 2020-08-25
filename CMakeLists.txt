@@ -19,6 +19,9 @@ aux_source_directory(process PROCESS_SRC)
 aux_source_directory(gcc GCC_SRC)
 aux_source_directory(structure STRUCTURE_SRC)
 aux_source_directory(socket SOCKET_SRC)
+aux_source_directory(meta META_SRC)
+aux_source_directory(functional FUNCTIONAL_SRC)
+aux_source_directory(feature FEATURE_SRC)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tty)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -30,6 +33,6 @@ add_executable(${PROJECT_NAME}
         ${CRC_SRC} ${TIME_SRC} ${TRIVIAL_SRC} ${CLASS_SRC}
         ${NUM_SRC} ${CONTAINER_SRC} ${ALGORITHM_SRC} ${PTRACE_SRC}
         ${BUILTIN_SRC} ${PROCESS_SRC} ${GCC_SRC} ${STRUCTURE_SRC}
-        ${SOCKET_SRC})
+        ${SOCKET_SRC} ${META_SRC} ${FUNCTIONAL_SRC} ${FEATURE_SRC})
 
 target_link_libraries(${PROJECT_NAME} pthread)

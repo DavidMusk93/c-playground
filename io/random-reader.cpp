@@ -19,10 +19,8 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <error.h>
 #include <string.h>
 #include <poll.h>
-#include <fcntl.h>
 
 #define LOG(fmt,...) printf(fmt "\n",##__VA_ARGS__)
 
@@ -174,6 +172,9 @@ public:
 
     ~RemoteReader() override{
         terminator.Trigger();
+        if(actor_.joinable()){
+            actor_.join();
+        }
         if(GetFd()!=-1){
             close(GetFd());
         }
