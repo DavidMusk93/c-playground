@@ -121,6 +121,7 @@ namespace sun{
 
 class Collector{
 public:
+#define TAG "(COLLECTOR)"
 //    struct Payload{
 //        char buf[64]{};
 //        int len{};
@@ -139,64 +140,72 @@ public:
         ERROR_RETURN((epoll_handler_=epoll_create1(0))==-1,,,1);
     }
     ~Collector(){
+        quit();
         FdHelper::Close(fd_);
         FdHelper::Close(epoll_handler_);
     }
     bool registerSource(int fd,decltype/*build-in?*/(std::declval<Connection::Callback>().on_recv) on_recv){
+        if(epoll_handler_==-1){
+//            LOG("(COLLECTOR)epoll instance has not created");
+            close(fd);
+            return false;
+        }
         auto handler=std::make_shared<Connection>(fd);
         ERROR_RETURN(handler->epollRegister(epoll_handler_,EPOLLIN|EPOLLET|EPOLLRDHUP)==-1,false,,0);
         handler->registerCallback({std::move(on_recv),nullptr,[handler,this](int&){handlers_.erase(handler);}},this);
+        handlers_.insert(handler);
         return true;
     }
     void addPayload(std::string payload){
         payloads_.offer(std::move(payload));
     }
 
-    void start(){
+    void loop(){
         if(Ready()){
-            producer_=std::thread(&Collector::Produce,this);
+//            producer_=std::thread(&Collector::Produce,this);
             consumer_=std::thread(&Collector::Consume,this);
+            Produce();
         }
     }
 
-    void stop(){
+    void quit(){
 #define JOIN(x) \
 do{\
     if(x.joinable()){x.join();}\
 }while(0)
         payloads_.finish();
         terminator_.trigger();
-        JOIN(producer_);
+//        JOIN(producer_);
         JOIN(consumer_);
 #undef JOIN
     }
 
 public:
-    static void handleGroupMsg(int fd,void*user_data){
-        auto collector=reinterpret_cast<Collector*>(user_data);
-        char buf[64];
-        int nr;
-        struct sockaddr_in from{};
-        socklen_t len{sizeof(from)};
-        nr=recvfrom(fd,buf,sizeof(buf),0,(struct sockaddr*)&from,&len);
-        LOG("(COLLECTOR)received '%.*s' from" SOCKADDR_FMT,nr,buf,SOCKADDR_OF(from));
-        collector->addPayload(std::string(buf,nr));
-    }
+    static void HandleGroupMsg(int fd, void*user_data);
+    static void HandlerInterrupt(int fd, void*user_data);
 
 protected:
     void Produce(){
 #define MAX_EVENTS 10
         int nfds;
         struct epoll_event events[MAX_EVENTS];
-        Connection term{terminator_.observeFd()};
-        ERROR_RETURN(term.epollRegister(epoll_handler_,EPOLLIN)==-1,,,0);
-        term.cancel();
+        Connection tmp{terminator_.observeFd()};
+        ERROR_RETURN(tmp.epollRegister(epoll_handler_,EPOLLIN)==-1,,,0);
+        tmp.cancel();
+        tmp=Connection{fd_};
+        ERROR_RETURN(tmp.epollRegister(epoll_handler_,EPOLLRDHUP)==-1,,,0);
+        tmp.cancel();
         for(;;){
             ERROR_RETURN((nfds=epoll_wait(epoll_handler_,events,MAX_EVENTS,-1))==-1,,,1);
             for(int i=0;i<nfds;++i){
                 const auto&fd=events[i].data.fd;
+                if(fd==fd_&&events[i].events&EPOLLRDHUP){
+                    LOG(TAG "remote server has disconnected");
+                    goto end;
+                }
                 if(fd==terminator_.observeFd()){
-                    break;
+                    terminator_.cleanup();
+                    goto end;
                 }
                 for(auto&handler:handlers_){
                     if(handler->fd()==fd){
@@ -205,6 +214,8 @@ protected:
                 }
             }
         }
+end:
+        return;
     }
     void Consume(){
         for(;;){
@@ -227,8 +238,27 @@ private:
     sun::Queue<std::string> payloads_;
     std::unordered_set<Connection::Handler> handlers_;
     Terminator terminator_;
-    std::thread producer_,consumer_;
+    std::thread /*producer_,*/consumer_;
 };
+
+void Collector::HandleGroupMsg(int fd, void *user_data){
+    auto collector=reinterpret_cast<Collector*>(user_data);
+    char buf[64];
+    int nr;
+    struct sockaddr_in from{};
+    socklen_t len{sizeof(from)};
+    nr=recvfrom(fd,buf,sizeof(buf),0,(struct sockaddr*)&from,&len);
+    LOG(TAG "receive '%.*s' from " SOCKADDR_FMT,nr,buf,SOCKADDR_OF(from));
+    collector->addPayload(std::string(buf,nr));
+}
+
+void Collector::HandlerInterrupt(int fd, void *user_data) {
+    auto collector=reinterpret_cast<Collector*>(user_data);
+    auto ss=Signal::Read(fd);
+    LOG(TAG "receive signal #%d",ss.ssi_signo);
+    collector->quit();
+}
+#undef TAG
 
 template<typename T>
 std::vector<T> split(const char*s,char separator,const std::function<T(const std::string&)>& op){
@@ -275,10 +305,11 @@ int main(int argc,char*argv[]){
 //    }
     auto ports=split<short>(argv[1],',',[](const std::string&s)->short{return (std::stoi(s)&/*lower precedence*/0xff)+PORT_BASE;});
     Collector collector{SERVER_IP,SERVER_PORT};
+    collector.registerSource(Signal().registerSignal(SIGINT).registerSignal(SIGQUIT).fd(), &Collector::HandlerInterrupt);
     for(auto port:ports){
-        collector.registerSource(Group(GROUP_IP,port).fd()/*transfer ownership*/,&Collector::handleGroupMsg);
+        collector.registerSource(Group(GROUP_IP,port).fd()/*transfer ownership*/, &Collector::HandleGroupMsg);
     }
-    collector.start();
-    pause();
-    collector.stop();
+    collector.loop();
+//    pause();
+//    collector.stop();
 }

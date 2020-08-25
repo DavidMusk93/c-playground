@@ -25,8 +25,9 @@
 #include <fcntl.h>
 
 //#include "time/now.h"
+#include "tool.h"
 
-#define LOG(fmt,...) printf(fmt "\n",##__VA_ARGS__)
+#define LOG(fmt,...) printf("%s " fmt "\n",sun::time::format(NOW()),##__VA_ARGS__)
 #define WHERE_FALSE while(0)
 
 #define ERROR_S strerror(errno)
@@ -144,6 +145,12 @@ public:
     using Handler=std::shared_ptr<Connection>;
     Connection():Connection(-1){}
     Connection(int fd):fd_(fd){}
+    Connection&operator=(Connection&&other)noexcept{
+        std::swap(fd_,other.fd_);
+        std::swap(callback_,other.callback_);
+        std::swap(user_data_,other.user_data_);
+        return *this;
+    }
     ~Connection(){
         Cleanup(fd_);
     }
