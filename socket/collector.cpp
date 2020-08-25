@@ -273,7 +273,7 @@ int main(int argc,char*argv[]){
 //    for(auto&i:split<int>(ports,',',[](const std::string&s)->int{return std::stoi(s);})){
 //        LOG("%d",i);
 //    }
-    auto ports=split<short>(argv[1],',',[](const std::string&s)->short{return std::stoi(s)&0xff+PORT_BASE;});
+    auto ports=split<short>(argv[1],',',[](const std::string&s)->short{return (std::stoi(s)&/*lower precedence*/0xff)+PORT_BASE;});
     Collector collector{SERVER_IP,SERVER_PORT};
     for(auto port:ports){
         collector.registerSource(Group(GROUP_IP,port).fd()/*transfer ownership*/,&Collector::handleGroupMsg);
