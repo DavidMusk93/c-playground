@@ -11,7 +11,11 @@
 #include <time.h>
 #include <sys/time.h>
 #include <stdio.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
 
+#include <atomic>
+#include <functional>
 
 #define NOW() ({\
     timeval tv{};\
@@ -68,6 +72,110 @@ private:
     double ts_;
 
     static constexpr const size_t MAX=30;
+};
+
+class noncopyable{
+public:
+    noncopyable(const noncopyable&)=delete;
+    noncopyable&operator=(const noncopyable&)=delete;
+
+protected:
+    noncopyable()=default;
+    ~noncopyable()=default;
+};
+
+class Spinlock{
+public:
+    Spinlock(std::atomic_flag&flag):flag_(flag){
+        while(flag_.test_and_set(std::memory_order_acquire));
+    }
+    ~Spinlock(){
+        flag_.clear(std::memory_order_release);
+    }
+
+private:
+    std::atomic_flag&flag_;
+};
+
+class FdHelper{
+public:
+    FdHelper()=delete;
+
+    static void SetNonblock(int fd){
+        int flags;
+        fcntl(fd,F_GETFL,&flags);
+        fcntl(fd,F_SETFL,flags|O_NONBLOCK);
+    }
+
+    static int UnreadSize(int fd){
+        int size{};
+        ioctl(fd,FIONREAD,&size);
+        return size;
+    }
+
+    static void Close(int&fd){
+        if(fd!=-1){
+            close(fd);
+            fd=-1;
+        }
+    }
+
+public:
+    static constexpr int kPipeRead=0;
+    static constexpr int kPipeWrite=1;
+};
+
+class Terminator{
+public:
+    Terminator():fds_{-1,-1}{
+        pipe2(fds_,O_NONBLOCK);
+    }
+
+    ~Terminator(){
+        close(fds_[0]),close(fds_[1]);
+        fds_[0]=fds_[1]=-1;
+    }
+
+    int observeFd(){
+        return fds_[FdHelper::kPipeRead];
+    }
+
+    void trigger(){
+        char c='Q';
+        write(fds_[FdHelper::kPipeWrite],&c,1);
+    }
+
+    void cleanup(){
+        char c;
+        read(fds_[FdHelper::kPipeRead],&c,1);
+    }
+
+private:
+    int fds_[2];
+};
+
+using Closure=std::function<void()>;
+
+class Cleaner{
+public:
+    Cleaner(Closure closure):final_(std::move(closure)){}
+    Cleaner&operator=(Cleaner&&cleaner)noexcept{
+        final_.swap(cleaner.final_);
+        return *this;
+    }
+    ~Cleaner(){
+        if(final_){
+            final_();
+        }
+    }
+
+    void cancel(){
+        Closure trivial;
+        final_.swap(trivial);
+    }
+
+private:
+    Closure final_;
 };
 
 #endif //C4FUN_TOOL_H

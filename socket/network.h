@@ -53,87 +53,6 @@ name.sin_family=AF_INET;\
 name.sin_addr.s_addr=addr;\
 name.sin_port=port
 
-class FdHelper{
-public:
-    FdHelper()=delete;
-
-    static void SetNonblock(int fd){
-        int flags;
-        fcntl(fd,F_GETFL,&flags);
-        fcntl(fd,F_SETFL,flags|O_NONBLOCK);
-    }
-
-    static int UnreadSize(int fd){
-        int size{};
-        ioctl(fd,FIONREAD,&size);
-        return size;
-    }
-
-    static void Close(int&fd){
-        if(fd!=-1){
-            close(fd);
-            fd=-1;
-        }
-    }
-
-public:
-    static constexpr int kPipeRead=0;
-    static constexpr int kPipeWrite=1;
-};
-
-class Terminator{
-public:
-    Terminator():fds_{-1,-1}{
-        pipe2(fds_,O_NONBLOCK);
-    }
-
-    ~Terminator(){
-        close(fds_[0]),close(fds_[1]);
-        fds_[0]=fds_[1]=-1;
-    }
-
-    int observeFd(){
-        return fds_[FdHelper::kPipeRead];
-    }
-
-    void trigger(){
-        char c='Q';
-        write(fds_[FdHelper::kPipeWrite],&c,1);
-    }
-
-    void cleanup(){
-        char c;
-        read(fds_[FdHelper::kPipeRead],&c,1);
-    }
-
-private:
-    int fds_[2];
-};
-
-using Closure=std::function<void()>;
-
-class Cleaner{
-public:
-    Cleaner(Closure closure):final_(std::move(closure)){}
-    Cleaner&operator=(Cleaner&&cleaner)noexcept{
-        final_.swap(cleaner.final_);
-        return *this;
-    }
-    ~Cleaner(){
-        if(final_){
-            final_();
-        }
-    }
-
-    void cancel(){
-        Closure trivial;
-        final_.swap(trivial);
-    }
-
-private:
-    Closure final_;
-};
-
 class Connection{
 public:
     struct Callback{
@@ -219,7 +138,7 @@ protected:
 private:
     std::string ip_;
     short port_;
-    int fd_;
+    int fd_; //shared_ptr may be better
 };
 
 #endif //C4FUN_NETWORK_H

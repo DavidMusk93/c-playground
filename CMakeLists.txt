@@ -25,6 +25,7 @@ aux_source_directory(feature FEATURE_SRC)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tty)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/socket)
 
 set(CMAKE_CXX_STANDARD 17)
 

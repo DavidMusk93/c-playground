@@ -3,6 +3,7 @@
 //
 
 #include "network.h"
+#include "codec.h"
 
 #include <deque>
 #include <mutex>
@@ -12,29 +13,6 @@
 #include <type_traits>
 
 namespace sun{
-    class noncopyable{
-    public:
-        noncopyable(const noncopyable&)=delete;
-        noncopyable&operator=(const noncopyable&)=delete;
-
-    protected:
-        noncopyable()=default;
-        ~noncopyable()=default;
-    };
-
-    class Spinlock{
-    public:
-        Spinlock(std::atomic_flag&flag):flag_(flag){
-            while(flag_.test_and_set(std::memory_order_acquire));
-        }
-        ~Spinlock(){
-            flag_.clear(std::memory_order_release);
-        }
-
-    private:
-        std::atomic_flag&flag_;
-    };
-
     template<typename T>
     class Queue final:public noncopyable{
 #define LOCK() std::unique_lock<std::mutex> lock(mutex_)
@@ -223,7 +201,7 @@ end:
             if(!payloads_.poll(payload)){
                 break;
             }
-            send(fd_,payload.data(),payload.size(),0/*MSG_MORE*/);
+            TIMETHIS(send(fd_,payload.data(),payload.size(),0/*MSG_MORE*/));
         }
     }
 
@@ -249,7 +227,11 @@ void Collector::HandleGroupMsg(int fd, void *user_data){
     socklen_t len{sizeof(from)};
     nr=recvfrom(fd,buf,sizeof(buf),0,(struct sockaddr*)&from,&len);
     LOG(TAG "receive '%.*s' from " SOCKADDR_FMT,nr,buf,SOCKADDR_OF(from));
-    collector->addPayload(std::string(buf,nr));
+    auto input=Codec::Input{};
+    input.parseIp(inet_ntoa(from.sin_addr)).parseWeight(buf).parseBlock(buf);
+//    collector->addPayload(std::string(buf,nr));
+    auto x=Codec::Encode(input);
+    collector->addPayload(std::string(reinterpret_cast<char*>(&x),sizeof(x)));
 }
 
 void Collector::HandlerInterrupt(int fd, void *user_data) {
@@ -303,7 +285,7 @@ int main(int argc,char*argv[]){
 //    for(auto&i:split<int>(ports,',',[](const std::string&s)->int{return std::stoi(s);})){
 //        LOG("%d",i);
 //    }
-    auto ports=split<short>(argv[1],',',[](const std::string&s)->short{return (std::stoi(s)&/*lower precedence*/0xff)+PORT_BASE;});
+    auto ports=split<short>(argv[1],',',[](const std::string&s)->short{return (std::stoi(s)&/*lower precedence*/0xffu)+PORT_BASE;});
     Collector collector{SERVER_IP,SERVER_PORT};
     collector.registerSource(Signal().registerSignal(SIGINT).registerSignal(SIGQUIT).fd(), &Collector::HandlerInterrupt);
     for(auto port:ports){
