@@ -4,6 +4,7 @@
 
 #include "collector.h"
 #include "codec.h"
+#include "secure.h"
 
 #define _CALL_TAG(tag) LOG(TAG "@%s call " #tag,__func__)
 #define CALL_START() _CALL_TAG(START)
@@ -21,7 +22,7 @@ void Collector::HandleGroupMsg(int fd, void *user_data){
     input.parseIp(inet_ntoa(from.sin_addr)).parseWeight(buf).parseBlock(buf);
 //    collector->addPayload(std::string(buf,nr));
     auto x=Codec::Encode(input);
-    collector->addPayload(std::string(reinterpret_cast<char*>(&x),sizeof(x)));
+    collector->addPayload(Secure::Encrypt(&x,sizeof(x)));
 }
 
 void Collector::HandlerInterrupt(int fd, void *user_data) {

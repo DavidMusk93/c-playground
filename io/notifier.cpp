@@ -26,6 +26,7 @@
 #include "codec.h"
 #include "reader.h"
 #include "tool.h"
+#include "secure.h"
 
 Terminator terminator;
 
@@ -128,8 +129,18 @@ protected:
                         ERROR_RETURN4(epoll_ctl(epollfd,EPOLL_CTL_DEL,conn_sock,&ev)==-1,,,1);
                         close(conn_sock),conn_sock=-1;
                     }else if(events[i].events&EPOLLIN){
+                        auto buffer=Secure::CreateBuffer();
                         unsigned long x{};
-                        read(conn_sock,&x,sizeof(x));
+//                        read(conn_sock,&buffer[0],buffer.size());
+//                        read(conn_sock,&x,sizeof(x));
+                        recv(conn_sock,&buffer[0],buffer.size(),MSG_WAITALL); /*block read*/
+                        if(!Secure::Decrypt(buffer,&x,sizeof(x))){
+                            LOG("(READER)illegal peer,kick out");
+                            ev.data.fd=conn_sock;
+                            ERROR_RETURN4(epoll_ctl(epollfd,EPOLL_CTL_DEL,conn_sock,&ev)==-1,,,1);
+                            FdHelper::Close(conn_sock);
+                            continue;
+                        }
                         if(FdHelper::UnreadSize(GetObserveFd())<128){ //avoid filling up pipe
                             write(fds_[FdHelper::kPipeWrite],&x,sizeof(x));
                         }else{

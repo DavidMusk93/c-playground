@@ -91,6 +91,7 @@ public:
 
 private:
     int fd_;
+    bool legal_{false};
     Callback callback_;
     void*user_data_;
 };
