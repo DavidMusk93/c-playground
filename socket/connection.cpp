@@ -22,7 +22,7 @@ int Connection::epollUnregister(int epoll_handler) {
     struct epoll_event ev{};
     ev.data.fd=fd_;
     ERROR_RETURN(epoll_ctl(epoll_handler,EPOLL_CTL_DEL,fd_,&ev)==-1,-1,,1);
-    Cleanup(fd_);
+//    Cleanup(fd_); /*this API should not manipulate the FD*/
     return 0;
 }
 
@@ -37,7 +37,9 @@ void Connection::eventTrigger(int epoll_handler,int events) {
         if(callback_.on_close){
             callback_.on_close(fd_);
         }
-    }else if(callback_.on_recv&&(events&EPOLLIN)){
-        callback_.on_recv(fd_,user_data_);
+    }else if(events&EPOLLIN){
+        if(callback_.on_recv){
+            callback_.on_recv(fd_,user_data_);
+        }
     }
 }

@@ -121,7 +121,7 @@ protected:
                 }else if(fd==terminator.observeFd()){
                     break;
                 }else if(fd==conn_sock){
-                    LOG("#%d is ready: %x",conn_sock,events[i].events);
+//                    LOG("#%d is ready: %x",conn_sock,events[i].events);
                     if(events[i].events&EPOLLRDHUP){
                         LOG("remote connection (%d) closed",conn_sock);
                         ev.data.fd=conn_sock;
@@ -132,6 +132,8 @@ protected:
                         read(conn_sock,&x,sizeof(x));
                         if(FdHelper::UnreadSize(GetObserveFd())<128){ //avoid filling up pipe
                             write(fds_[FdHelper::kPipeWrite],&x,sizeof(x));
+                        }else{
+                            LOG("(READER)buffer is full,drop payload");
                         }
 //                        std::atomic_store_explicit(&x_,x,std::memory_order_release);
                         std::atomic_store_explicit(&state_,State::READY,std::memory_order_release);
@@ -180,6 +182,21 @@ private:
     std::unordered_map<std::string,std::vector<consumer_ptr>> table_;
 };
 
+
+void j2s(std::string&json){ //temporary
+    auto k=json.find('w'); //locate weight
+    if(k==std::string::npos){
+        return;
+    }
+    auto i=json.find(':',k);
+    auto j=json.find(',',k);
+    if(i==std::string::npos||j==std::string::npos){
+        return;
+    }
+    ++i;
+    json=json.substr(i,j-i);
+}
+
 class Notifier{
 public:
     using T=TopicManager::consumer_t;
@@ -206,6 +223,7 @@ public:
         auto task=std::make_shared<T>(std::move(notify));
         manager_.subscribe(topics,task);
         subscriber_.insert({key,std::weak_ptr<T>(task)});
+        LOG("(NOTIFIER)subscriber count #%ld",subscriber_.size());
     }
 
 protected:
@@ -216,7 +234,7 @@ protected:
         };
         for(;;){
             int nfds=poll(pfd,2,-1);
-            ERROR_RETURN(nfds==-1,,,"poll: %s",ERROR_S);
+            ERROR_RETURN(nfds==-1,,{exit(1);/*force quit*/},"poll: %s",ERROR_S);
 //            if(nfds==0){
 //                continue;
 //            }
@@ -230,13 +248,27 @@ protected:
             std::vector<std::shared_ptr<T>> tasks;
             {
                 Spinlock lock(flag_);
+                std::vector<intptr_t> invalid;
+                for(auto&p:subscriber_){
+                    if(!p.second.lock()){
+//                    subscriber_.erase(p.first);
+                        invalid.push_back(p.first);
+                    }
+                }
+                for(auto&k:invalid){
+                    LOG("erase handler #%p",reinterpret_cast<void*>(k));
+                    subscriber_.erase(k);
+                }
                 auto&ref=manager_[output.topic];
                 if(ref.empty()){
+                    LOG("(NOTIFIER)no subscriber,drop '%s'",output.payload.c_str());
                     continue;
                 }
                 tasks.swap(ref);
             }
             std::vector<std::shared_ptr<T>> valid;
+//            j2s(output.payload);
+            LOG("(NOTIFIER)task count #%ld",tasks.size());
             for(auto&p:tasks){
                 if((*p)(output.payload.data(),output.payload.size())){
                     valid.push_back(std::move(p));
@@ -249,11 +281,6 @@ protected:
             auto&ref=manager_[output.topic];
             for(auto&k:valid){
                 ref.push_back(std::move(k));
-            }
-            for(auto&p:subscriber_){
-                if(!p.second.lock()){
-                    subscriber_.erase(p.first);
-                }
             }
         }
     }
@@ -290,4 +317,7 @@ int main(){
     for(auto&i:parseTopic(uri)){
         LOG("%s",i.c_str());
     }
+    std::string json=R"({"topic":"%s","weight":256,"id":"%s"})";
+    j2s(json);
+    LOG("%s",json.c_str());
 }

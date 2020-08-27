@@ -7,10 +7,11 @@ ws.onopen = function () {
 }
 
 ws.onmessage = function (event) {
-    if(event.data.startsWith('{')){
-        const obj = JSON.parse(event.data)
-        console.log(obj.topic, obj.weight, obj.id)
-    }else{
-        console.log(event.data)
-    }
+    //if(event.data.startsWith('{')){
+    //    const obj = JSON.parse(event.data)
+    //    console.log(obj.topic, obj.weight, obj.id)
+    //}else{
+    //    console.log(event.data)
+    //}
+    console.log(event.data)
 }

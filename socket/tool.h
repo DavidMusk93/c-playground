@@ -18,9 +18,9 @@
 #include <functional>
 
 #define NOW() ({\
-    timeval tv{};\
-    gettimeofday(&tv,nullptr);/*VDSO(Virtual Dynamic Shared Object)*/\
-    tv;\
+    timeval __tv{};\
+    gettimeofday(&__tv,nullptr);/*VDSO(Virtual Dynamic Shared Object)*/\
+    __tv;\
 })
 #define SECONDS sun::time::seconds(NOW())
 
@@ -118,6 +118,12 @@ public:
             close(fd);
             fd=-1;
         }
+    }
+    static void Close(int&fd1,int&fd2){
+        Close(fd1),Close(fd2);
+    }
+    static void Close(int&fd1,int&fd2,int&fd3){
+        Close(fd1),Close(fd2,fd3);
     }
 
 public:

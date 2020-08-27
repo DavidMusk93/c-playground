@@ -59,11 +59,12 @@ Codec::Output & Codec::Output::load(u64 x) {
 #define PATTERN "{\"topic\":\"%s\",\"weight\":%d,\"id\":\"%s\"}"
     char buf[64];
     auto error=static_cast<u8>(x>>ERROR_OFFSET);
+    auto block=x&BLOCK_MASK;
     topic=std::to_string(static_cast<u8>((x>>IP_OFFSET)&IP_MASK));
     sprintf(buf,PATTERN,
             topic.c_str(),
             error?atoi(BAD):static_cast<short>((x>>WEIGHT_OFFSET)&WEIGHT_MASK),
-            i2s(x&BLOCK_MASK));
+            block?i2s(x&BLOCK_MASK):"NONE");
     payload=buf;
     return *this;
 }
