@@ -6,7 +6,9 @@
 #define C4FUN_COLLECTOR_H
 
 #include "network.h"
+#include "connector.h"
 
+#include <vector>
 #include <deque>
 #include <mutex>
 #include <condition_variable>
@@ -125,6 +127,12 @@ public:
         if(Connect()){
             ERROR_RETURN((epoll_handler_=epoll_create1(0))==-1,,,1);
             ERROR_RETURN((timer_fd_=timerfd_create(CLOCK_REALTIME,O_NONBLOCK|O_CLOEXEC))==-1,,,1);
+            database_.reset(ConnectorFactory::create(ConnectorFactory::MYSQL));
+            if(database_->ready()){
+                database_->use(DB_NAME)->registerStatement(SQL_STATEMENT);
+            }else{
+                database_.reset();
+            }
             state_.store(State::READY,std::memory_order_relaxed);
         }
     }
@@ -227,6 +235,10 @@ private:
         return state_.load(std::memory_order_relaxed)!=State::UNINITIALIZED;
     }
 
+    std::unique_ptr<Connector>&db(){
+        return database_;
+    }
+
     void OnConnect();
     void OnDisconnect();
     bool Connect();
@@ -242,6 +254,7 @@ private:
     std::unordered_set<Connection::Handler> handlers_;
     Terminator terminator_;
     std::thread /*producer_,*/consumer_;
+    std::unique_ptr<Connector> database_;
 };
 
 #endif //C4FUN_COLLECTOR_H

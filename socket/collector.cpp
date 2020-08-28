@@ -23,6 +23,10 @@ void Collector::HandleGroupMsg(int fd, void *user_data){
 //    collector->addPayload(std::string(buf,nr));
     auto x=Codec::Encode(input);
     collector->addPayload(Secure::Encrypt(&x,sizeof(x)));
+    if(collector->db()){
+        LOG("(CONNECTOR)save data");
+        collector->db()->set(1,inet_ntoa(from.sin_addr))->set(2,buf)->execute();
+    }
 }
 
 void Collector::HandlerInterrupt(int fd, void *user_data) {
