@@ -3,52 +3,62 @@
 //
 
 #include "secure.h"
+#include "reader.h"
 
 #include <cstring>
 
-using u8=unsigned char;
+static RandomReader entropy{"/dev/urandom"};
+
+using u8=Reader::u8;
+
+typedef union{
+    Reader::u32 x;
+    Reader::u8 p[sizeof(Reader::u32)];
+} IU;
+
+static void uniswap(u8*p){
+    IU u1{},u2{};
+    memcpy(u1.p,p,4);
+    memcpy(u2.p,p+8,4);
+    u1.x^=u2.x;
+    memcpy(p,u1.p,4);
+}
 
 std::string Secure::Encrypt(const void *data, size_t len/*8 for now*/) {
-#define RANDOM 4
+//#define RANDOM 4
     std::string res=SECRET;
     res.resize(kDataLen);
-    res[SECRET_LEN-1]=RANDOM;
-    memcpy(&res[SECRET_LEN],data,len);
+    memcpy(&res[SECRET_LEN+1],data,len); /*load real data*/
 //    Ring<kDataLen-1> ring;
 //    void*p=ring.next();
     auto p=reinterpret_cast<u8*>(&res[0]);
-    auto mask=p[RANDOM];
-    size_t i=RANDOM+1;
-    for(;i!=RANDOM;++i){
+    u8 mask=entropy.fetch<u8>(); /*fetch random u8*/
+    p[SECRET_LEN]=mask;
+    size_t i=SECRET_LEN+1;
+    for(;i!=SECRET_LEN;++i){
         if(i==kDataLen){
             i=0;
         }
-        if(i+1!=SECRET_LEN){
-            p[i]^=mask;
-        }
+        p[i]^=mask;
     }
+    uniswap(p);
     return res;
 }
 
 bool Secure::Decrypt(std::string &s, void *data, size_t len) {
     if(s.size()==kDataLen){
         auto p=reinterpret_cast<u8*>(&s[0]);
-        const auto R=p[SECRET_LEN-1];
-        if(R>=kDataLen){
-            return false;
-        }
-        auto mask=p[R];
-        size_t i=R+1;
-        for(;i!=R;++i){
+        uniswap(p);
+        auto mask=p[SECRET_LEN];
+        size_t i=SECRET_LEN+1;
+        for(;i!=SECRET_LEN;++i){
             if(i==kDataLen){
                 i=0;
             }
-            if(i+1!=SECRET_LEN){
-                p[i]^=mask;
-            }
+            p[i]^=mask;
         }
-        if(strncmp(&s[0],SECRET,SECRET_LEN-1)==0){
-            memcpy(data,&s[SECRET_LEN],len);
+        if(strncmp(&s[0],SECRET,SECRET_LEN)==0){
+            memcpy(data,&s[SECRET_LEN+1],len);
             return true;
         }
     }

@@ -27,7 +27,6 @@
 //#include "time/now.h"
 #include "tool.h"
 
-#define LOG(fmt,...) printf("%s " fmt "\n",sun::time::format(NOW()),##__VA_ARGS__)
 #define WHERE_FALSE while(0)
 
 #define ERROR_S strerror(errno)

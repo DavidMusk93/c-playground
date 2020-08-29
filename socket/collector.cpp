@@ -12,20 +12,21 @@
 
 void Collector::HandleGroupMsg(int fd, void *user_data){
     auto collector=reinterpret_cast<Collector*>(user_data);
-    char buf[64];
+    char buf[64]{};
     int nr;
     struct sockaddr_in from{};
     socklen_t len{sizeof(from)};
     nr=recvfrom(fd,buf,sizeof(buf),0,(struct sockaddr*)&from,&len);
     LOG(TAG "receive '%.*s' from " SOCKADDR_FMT,nr,buf,SOCKADDR_OF(from));
+    auto ip=inet_ntoa(from.sin_addr);
     auto input=Codec::Input{};
-    input.parseIp(inet_ntoa(from.sin_addr)).parseWeight(buf).parseBlock(buf);
+    input.parseIp(ip).parseWeight(buf).parseBlock(buf);
 //    collector->addPayload(std::string(buf,nr));
     auto x=Codec::Encode(input);
     collector->addPayload(Secure::Encrypt(&x,sizeof(x)));
     if(collector->db()){
-        LOG("(CONNECTOR)save data");
-        collector->db()->set(1,inet_ntoa(from.sin_addr))->set(2,buf)->execute();
+        LOG("(DATABASE)save (IP)%s & (DATA)%s",ip,buf);
+        collector->db()->set(1,ip)->set(2,buf)->execute();
     }
 }
 

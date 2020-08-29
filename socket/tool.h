@@ -32,10 +32,16 @@ do{\
     printf(#expr "cost #%f (s)\n",t2-t1);\
 }while(0)
 
-namespace sun::time{
-    extern timeval now();
-    extern double seconds(const timeval&tv);
-    extern const char*format(const timeval&tv);
+#define LOG(fmt,...) printf("%s " fmt "\n",sun::time::format(NOW()),##__VA_ARGS__)
+
+namespace sun/*nested namespace definition is a C++1z extension*/ {
+    namespace time {
+        extern timeval now();
+
+        extern double seconds(const timeval &tv);
+
+        extern const char *format(const timeval &tv);
+    }
 }
 
 class Signal{

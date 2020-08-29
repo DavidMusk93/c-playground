@@ -127,8 +127,10 @@ public:
         if(Connect()){
             ERROR_RETURN((epoll_handler_=epoll_create1(0))==-1,,,1);
             ERROR_RETURN((timer_fd_=timerfd_create(CLOCK_REALTIME,O_NONBLOCK|O_CLOEXEC))==-1,,,1);
-            database_.reset(ConnectorFactory::create(ConnectorFactory::MYSQL));
-            if(database_->ready()){
+            if(getenv("USE_DB")/*dynamic loading*/){
+                database_.reset(ConnectorFactory::create(ConnectorFactory::MYSQL));
+            }
+            if(database_&&database_->ready()){
                 database_->use(DB_NAME)->registerStatement(SQL_STATEMENT);
             }else{
                 database_.reset();

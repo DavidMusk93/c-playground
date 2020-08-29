@@ -28,6 +28,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tty)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/socket)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/db)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/io)
 
 set(CMAKE_CXX_STANDARD 17)
 

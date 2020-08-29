@@ -35,7 +35,7 @@ public:
 private:
     static constexpr const size_t kDataLen=4+8;
     static constexpr const char*SECRET="SUN";
-    static constexpr const size_t SECRET_LEN=4;
+    static constexpr const size_t SECRET_LEN=3;
 };
 
 #endif //C4FUN_SECURE_H
