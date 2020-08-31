@@ -38,13 +38,15 @@ void Collector::HandlerInterrupt(int fd, void *user_data) {
 }
 
 bool Collector::Connect() {
-    ERROR_RETURN((fd_=socket(AF_INET,SOCK_STREAM,0))==-1,false,,1);
-    Cleaner/*go defer alike*/ cleaner{[this]{close(fd_);}};
-    struct timeval tv{CONNECT_TIMEOUT,0};
-    SETSOCKOPT(fd_,SOL_SOCKET,SO_SNDTIMEO,tv,false);
+    if(fd_==-1){ /*to reuse socket resource*/
+        ERROR_RETURN((fd_=socket(AF_INET,SOCK_STREAM,0))==-1,false,,1);
+        struct timeval tv{CONNECT_TIMEOUT,0};
+        SETSOCKOPT(fd_,SOL_SOCKET,SO_SNDTIMEO,tv,false);
+    }
+//    Cleaner/*go defer alike*/ cleaner{[this]{close(fd_);}};
     ERROR_RETURN(connect(fd_,SOCKADDR_EX(server_address_))==-1,false,,1);
-    cleaner.cancel();
-    LOG(TAG "connect to " SOCKADDR_FMT,SOCKADDR_OF(server_address_));
+//    cleaner.cancel();
+    LOG(TAG "#%d connect to " SOCKADDR_FMT,fd_,SOCKADDR_OF(server_address_));
     return true;
 }
 
@@ -82,7 +84,10 @@ void Collector::OnConnect() {
     handler->registerCallback({nullptr,nullptr,[handler,this](int&){
         LOG(TAG "remote server is disconnected");
 //        handler->cancel(); /*avoid closing client(this endpoint is marked as connected)*/
-        handlers_.erase(handler);
+        handler->cancel();
+        handlers_.erase(handler); /*release resource*/
+//        fd_=-1; /*reset fd*/
+        FdHelper::Close(fd_);
         OnDisconnect();
     }},nullptr);
     handlers_.insert(handler);
