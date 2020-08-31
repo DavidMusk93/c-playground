@@ -16,7 +16,7 @@ typedef union{
     Reader::u8 p[sizeof(Reader::u32)];
 } IU;
 
-static void uniswap(u8*p){
+static FUNCTION_UNUSED void uniswap(u8*p){
     IU u1{},u2{};
     memcpy(u1.p,p,4);
     memcpy(u2.p,p+8,4);
@@ -41,14 +41,14 @@ std::string Secure::Encrypt(const void *data, size_t len/*8 for now*/) {
         }
         p[i]^=mask;
     }
-    uniswap(p);
+//    uniswap(p); /*poor(lost effect)*/
     return res;
 }
 
 bool Secure::Decrypt(std::string &s, void *data, size_t len) {
     if(s.size()==kDataLen){
         auto p=reinterpret_cast<u8*>(&s[0]);
-        uniswap(p);
+//        uniswap(p);
         auto mask=p[SECRET_LEN];
         size_t i=SECRET_LEN+1;
         for(;i!=SECRET_LEN;++i){
