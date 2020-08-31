@@ -4,6 +4,8 @@
 
 #include "tool.h"
 
+#include <sys/syscall.h>
+
 #include <thread>
 
 namespace sun::time{
@@ -25,8 +27,13 @@ namespace sun::time{
 }
 
 namespace sun::utility{
-    unsigned long tid(){
-        static thread_local const pthread_t id=pthread_self();
+    unsigned long tid(){ /*schedule*/
+//        static thread_local const pthread_t id=pthread_self(); /*POSIX thread id*/
+        static thread_local const pthread_t id=syscall(SYS_gettid); /*OS thread id*/
+        return static_cast<unsigned long>(id);
+    }
+    unsigned long pid(){ /*resource*/
+        static thread_local const pthread_t id=getpid();
         return static_cast<unsigned long>(id);
     }
 }

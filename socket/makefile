@@ -23,7 +23,7 @@ CXX?=g++
 CFLAGS+=-std=c++14 -Wall $(INCS)
 LDLIBS+=-lpthread -lmysqlcppconn
 
-.PHONY:main
+.PHONY:main,clean
 
 $(OBJS):$(OBJ_DIR)%.o:%.cpp
 	$(form-obj)
@@ -33,3 +33,7 @@ main:
 
 collector:$(OBJS)
 	$(CXX) $(CFLAGS) $^ -o $@ $(LDLIBS)
+
+clean:
+	@rm -f ./collector
+	@rm -rf ./obj/

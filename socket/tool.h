@@ -32,7 +32,14 @@ do{\
     printf(#expr "cost #%f (s)\n",t2-t1);\
 }while(0)
 
-#define LOG(fmt,...) printf("%s %#lx " fmt "\n",sun::time::format(NOW()),sun::utility::tid(),##__VA_ARGS__)
+#define USE_OS_TID 1
+#if USE_OS_TID
+#define TID_FMT "%lu"
+#else
+#define TID_FMT "%#lx"
+#endif
+
+#define LOG(fmt,...) printf("%s " TID_FMT " " fmt "\n",sun::time::format(NOW()),sun::utility::tid(),##__VA_ARGS__)
 
 #define __TRIVIAL()
 #define POLL(__pr,__fn,...) \
@@ -44,6 +51,9 @@ if(__pr<0){\
 }
 __TRIVIAL()
 
+#define __ATTRIBUTE(keyword) __attribute__((keyword))
+#define FUNCTION_UNUSED __ATTRIBUTE(unused)
+
 namespace sun/*nested namespace definition is a C++1z extension*/ {
     namespace time {
         extern timeval now();
@@ -54,6 +64,7 @@ namespace sun/*nested namespace definition is a C++1z extension*/ {
     }
     namespace utility{
         unsigned long tid();
+        unsigned long pid();
     }
 }
 
