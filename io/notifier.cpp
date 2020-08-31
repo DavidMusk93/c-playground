@@ -35,6 +35,7 @@ Terminator terminator;
 #define THREAD_KERNEL_END(tag) THREAD_KERNEL_TAG(tag,END)
 
 class RemoteReader:public Reader{
+#define TAG "(RELAY)"
 #define SOCKADDR_EX(x) reinterpret_cast<struct sockaddr*>(&x),sizeof(x)
 public:
     static constexpr short PORT=10001;
@@ -99,7 +100,7 @@ protected:
 #define TIMEOUT 5000/*ms*/
 //        static int count=0;
         struct epoll_event ev{},events[MAX_EVENTS]{};
-        int nfds,epollfd,conn_sock;
+        int nfds,epollfd;
         ERROR_RETURN((epollfd=epoll_create1(0))==-1,,,"epoll_create1: %s",ERROR_S);
         Cleaner cleaner{[&epollfd](){close(epollfd);}};
         ev.events=EPOLLIN;
@@ -109,52 +110,50 @@ protected:
         ev.data.fd=terminator.observeFd();
         ERROR_RETURN(epoll_ctl(epollfd,EPOLL_CTL_ADD,terminator.observeFd(),&ev)==-1,,,"epoll_ctl: %s",ERROR_S);
         for(;;){
-            POLL(nfds,epoll_wait,epollfd,events,MAX_EVENTS,/*TIMEOUT*/-1);
+            POLL(nfds,epoll_wait,epollfd,events,MAX_EVENTS,TIMEOUT);
             if(nfds==0){
                 std::atomic_store_explicit(&state_,State::WAIT,std::memory_order_relaxed);
             }
             for(int i=0;i<nfds;++i){
                 const auto&fd=events[i].data.fd;
-                if(fd==GetFd()){
+                if(fd==GetFd()){ /*accept new connection*/
+                    int sock{-1};
                     struct sockaddr_in peer{};
                     socklen_t len{sizeof(peer)};
-                    ERROR_RETURN((conn_sock=accept4(fd,(struct sockaddr*)&peer,&len,O_NONBLOCK))==-1,,,"accept4: %s",ERROR_S);
-                    LOG("new connection from %s:%d",inet_ntoa(peer.sin_addr),ntohs(peer.sin_port));
+                    ERROR_RETURN((sock=accept4(fd,(struct sockaddr*)&peer,&len,O_NONBLOCK))==-1,,,"accept4: %s",ERROR_S);
+                    Cleaner onfail{[sock]{close(sock);}};
+                    LOG(TAG "new connection from %s:%d",inet_ntoa(peer.sin_addr),ntohs(peer.sin_port));
                     ev.events=EPOLLIN|EPOLLET|EPOLLHUP|EPOLLRDHUP;
-                    ev.data.fd=conn_sock;
-                    LOG("add %d to epoll instance",conn_sock);
-                    ERROR_RETURN(epoll_ctl(epollfd,EPOLL_CTL_ADD,conn_sock,&ev)==-1,,{close(conn_sock);},"epoll_ctl: %s",ERROR_S);
-                }else if(fd==terminator.observeFd()){
+                    ev.data.fd=sock;
+                    LOG(TAG "add %d to epoll instance",sock);
+                    ERROR_RETURN(epoll_ctl(epollfd,EPOLL_CTL_ADD,sock,&ev)==-1,,,"epoll_ctl: %s",ERROR_S);
+                    onfail.cancel();
+                }else if(fd==terminator.observeFd()){ /*terminate*/
                     break;
-                }else if(fd==conn_sock){
-//                    LOG("#%d is ready: %x",conn_sock,events[i].events);
+                }else{ /*enable multiple sources*/
+                    LOG(TAG "#%d is ready: %#x",fd,events[i].events);
                     if(events[i].events&EPOLLRDHUP){
-                        LOG("remote connection (%d) closed",conn_sock);
-                        ev.data.fd=conn_sock;
-                        ERROR_RETURN4(epoll_ctl(epollfd,EPOLL_CTL_DEL,conn_sock,&ev)==-1,,,1);
-                        close(conn_sock),conn_sock=-1;
+                        Cleaner onfinal{[fd]{close(fd);}};
+                        LOG(TAG "remote connection (%d) closed",fd);
+                        ERROR_RETURN4(epoll_ctl(epollfd,EPOLL_CTL_DEL,fd,nullptr)==-1,,,1);
                     }else if(events[i].events&EPOLLIN){
                         auto buffer=Secure::CreateBuffer();
                         unsigned long x{};
-//                        read(conn_sock,&buffer[0],buffer.size());
-//                        read(conn_sock,&x,sizeof(x));
-                        recv(conn_sock,&buffer[0],buffer.size(),MSG_WAITALL); /*block read*/
+                        recv(fd,&buffer[0],buffer.size(),MSG_WAITALL); /*block read*/
                         if(!Secure::Decrypt(buffer,&x,sizeof(x))){
-                            LOG("(READER)illegal peer,kick out");
-                            ev.data.fd=conn_sock;
-                            ERROR_RETURN4(epoll_ctl(epollfd,EPOLL_CTL_DEL,conn_sock,&ev)==-1,,,1);
-                            FdHelper::Close(conn_sock);
+                            Cleaner onfinal{[fd]{close(fd);}};
+                            LOG(TAG "illegal peer,kick out #%d",fd);
+                            ERROR_RETURN4(epoll_ctl(epollfd,EPOLL_CTL_DEL,fd,nullptr)==-1,,,1);
                             continue;
                         }
                         int ub=FdHelper::UnreadSize(GetObserveFd());
-//                        LOG("(RELAY)left bytes:%d",ub);
-                        if(ub<128){ //avoid filling up pipe
+                        if(ub<128){ /*avoid filling up the pipe*/
                             auto nw=write(fds_[FdHelper::kPipeWrite],&x,sizeof(x));
                             if(nw==-1){
-                                LOG("(RELAY)write failed:%s",ERROR_S);
+                                LOG(TAG "write failed:%s",ERROR_S);
                             }
                         }else{
-                            LOG("(RELAY)buffer is full,drop payload");
+                            LOG(TAG "buffer is full,drop payload");
                         }
 //                        std::atomic_store_explicit(&x_,x,std::memory_order_release);
                         std::atomic_store_explicit(&state_,State::READY,std::memory_order_release);
@@ -173,6 +172,7 @@ private:
     std::atomic<int> x_;
     std::thread actor_;
 #undef SOCKADDR_EX
+#undef TAG
 };
 
 class TopicManager{
