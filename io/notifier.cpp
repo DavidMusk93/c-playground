@@ -30,6 +30,10 @@
 
 Terminator terminator;
 
+#define THREAD_KERNEL_TAG(tag,state) LOG("@THREAD_KERNEL ("#tag ") " #state)
+#define THREAD_KERNEL_START(tag) THREAD_KERNEL_TAG(tag,START)
+#define THREAD_KERNEL_END(tag) THREAD_KERNEL_TAG(tag,END)
+
 class RemoteReader:public Reader{
 #define SOCKADDR_EX(x) reinterpret_cast<struct sockaddr*>(&x),sizeof(x)
 public:
@@ -90,8 +94,9 @@ protected:
     };
 
     void Run(){
+        THREAD_KERNEL_START(RELAY);
 #define MAX_EVENTS 10
-#define TIMEOUT 500 //ms
+#define TIMEOUT 5000/*ms*/
 //        static int count=0;
         struct epoll_event ev{},events[MAX_EVENTS]{};
         int nfds,epollfd,conn_sock;
@@ -104,7 +109,7 @@ protected:
         ev.data.fd=terminator.observeFd();
         ERROR_RETURN(epoll_ctl(epollfd,EPOLL_CTL_ADD,terminator.observeFd(),&ev)==-1,,,"epoll_ctl: %s",ERROR_S);
         for(;;){
-            ERROR_RETURN((nfds=epoll_wait(epollfd,events,MAX_EVENTS,TIMEOUT))==-1,,,"epoll_wait: %s",ERROR_S);
+            POLL(nfds,epoll_wait,epollfd,events,MAX_EVENTS,/*TIMEOUT*/-1);
             if(nfds==0){
                 std::atomic_store_explicit(&state_,State::WAIT,std::memory_order_relaxed);
             }
@@ -141,10 +146,15 @@ protected:
                             FdHelper::Close(conn_sock);
                             continue;
                         }
-                        if(FdHelper::UnreadSize(GetObserveFd())<128){ //avoid filling up pipe
-                            write(fds_[FdHelper::kPipeWrite],&x,sizeof(x));
+                        int ub=FdHelper::UnreadSize(GetObserveFd());
+//                        LOG("(RELAY)left bytes:%d",ub);
+                        if(ub<128){ //avoid filling up pipe
+                            auto nw=write(fds_[FdHelper::kPipeWrite],&x,sizeof(x));
+                            if(nw==-1){
+                                LOG("(RELAY)write failed:%s",ERROR_S);
+                            }
                         }else{
-                            LOG("(READER)buffer is full,drop payload");
+                            LOG("(RELAY)buffer is full,drop payload");
                         }
 //                        std::atomic_store_explicit(&x_,x,std::memory_order_release);
                         std::atomic_store_explicit(&state_,State::READY,std::memory_order_release);
@@ -154,6 +164,7 @@ protected:
         }
 #undef TIMEOUT
 #undef MAX_EVENTS
+        THREAD_KERNEL_END(RELAY);
     }
 
 private:
@@ -239,13 +250,15 @@ public:
 
 protected:
     void Run(){
+        THREAD_KERNEL_START(NOTIFIER);
         struct pollfd pfd[2]={
                 {.fd=terminator.observeFd(),.events=POLLIN},
                 {.fd=reader_->GetObserveFd(),.events=POLLIN},
         };
+        int nfds{};
         for(;;){
-            int nfds=poll(pfd,2,-1);
-            ERROR_RETURN(nfds==-1,,{exit(1);/*force quit*/},"poll: %s",ERROR_S);
+            POLL(nfds,poll,pfd,2,-1);
+//            ERROR_RETURN(nfds==-1,,{exit(1);/*force quit*/},"poll: %s",ERROR_S);
 //            if(nfds==0){
 //                continue;
 //            }
@@ -261,13 +274,13 @@ protected:
                 Spinlock lock(flag_);
                 std::vector<intptr_t> invalid;
                 for(auto&p:subscriber_){
-                    if(!p.second.lock()){
+                    if(!p.second.lock()){ /*try promotion*/
 //                    subscriber_.erase(p.first);
                         invalid.push_back(p.first);
                     }
                 }
                 for(auto&k:invalid){
-                    LOG("erase handler #%p",reinterpret_cast<void*>(k));
+                    LOG("erase handler %p",reinterpret_cast<void*>(k));
                     subscriber_.erase(k);
                 }
                 auto&ref=manager_[output.topic];
@@ -281,7 +294,7 @@ protected:
 //            j2s(output.payload);
             LOG("(NOTIFIER)task count #%ld",tasks.size());
             for(auto&p:tasks){
-                if((*p)(output.payload.data(),output.payload.size())){
+                if((*p)(output.payload.data(),output.payload.size())){ /*real publish*/
                     valid.push_back(std::move(p));
                 }
             }
@@ -294,6 +307,7 @@ protected:
                 ref.push_back(std::move(k));
             }
         }
+        THREAD_KERNEL_END(NOTIFIER);
     }
 
 private:

@@ -192,7 +192,8 @@ protected:
         c.cancel();
         OnConnect();
         for(;;){
-            ERROR_RETURN((nfds=epoll_wait(epoll_handler_,events,MAX_EVENTS,-1))==-1,,,1);
+//            ERROR_RETURN((nfds=epoll_wait(epoll_handler_,events,MAX_EVENTS,-1))==-1,,,1);
+            POLL(nfds,epoll_wait,epoll_handler_,events,MAX_EVENTS,-1);
             for(int i=0;i<nfds;++i){
                 const auto&fd=events[i].data.fd;
                 if(fd==terminator_.observeFd()){

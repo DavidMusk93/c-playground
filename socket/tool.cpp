@@ -4,6 +4,8 @@
 
 #include "tool.h"
 
+#include <thread>
+
 namespace sun::time{
     timeval now(){
         timeval tv{};
@@ -19,6 +21,13 @@ namespace sun::time{
         static __thread char buf[64];
         sprintf(buf,"%ld.%06ld",tv.tv_sec,tv.tv_usec);
         return buf;
+    }
+}
+
+namespace sun::utility{
+    unsigned long tid(){
+        static thread_local const pthread_t id=pthread_self();
+        return static_cast<unsigned long>(id);
     }
 }
 

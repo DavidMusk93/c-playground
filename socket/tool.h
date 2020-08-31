@@ -32,7 +32,17 @@ do{\
     printf(#expr "cost #%f (s)\n",t2-t1);\
 }while(0)
 
-#define LOG(fmt,...) printf("%s " fmt "\n",sun::time::format(NOW()),##__VA_ARGS__)
+#define LOG(fmt,...) printf("%s %#lx " fmt "\n",sun::time::format(NOW()),sun::utility::tid(),##__VA_ARGS__)
+
+#define __TRIVIAL()
+#define POLL(__pr,__fn,...) \
+__pr=__fn(__VA_ARGS__);\
+if(__pr<0){\
+    if(errno==EINTR||errno==EAGAIN){continue;}\
+    LOG(#__fn ":%s",ERROR_S);\
+    break;\
+}
+__TRIVIAL()
 
 namespace sun/*nested namespace definition is a C++1z extension*/ {
     namespace time {
@@ -41,6 +51,9 @@ namespace sun/*nested namespace definition is a C++1z extension*/ {
         extern double seconds(const timeval &tv);
 
         extern const char *format(const timeval &tv);
+    }
+    namespace utility{
+        unsigned long tid();
     }
 }
 
