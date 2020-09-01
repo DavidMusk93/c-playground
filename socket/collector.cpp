@@ -5,6 +5,7 @@
 #include "collector.h"
 #include "codec.h"
 #include "secure.h"
+#include "logger.h"
 
 #define _CALL_TAG(tag) LOG(TAG "@%s call " #tag,__func__)
 #define CALL_START() _CALL_TAG(START)
@@ -157,6 +158,8 @@ int main(int argc,char*argv[]){
     if(argc<2){
         return 1;
     }
+    auto logger=Logger::CreateLogger<10,1>("/tmp/collector.log");
+    logger.redirect().detach();
 //    const char*ports=argv[1];
 //    LOG("%s",ports);
 //    for(auto&i:split<int>(ports,',',[](const std::string&s)->int{return std::stoi(s);})){

@@ -15,6 +15,7 @@ SRCS:=collector.cpp\
 	tool.cpp\
 	codec.cpp\
 	secure.cpp\
+	logger.cpp\
 	../db/mysql-connector.cpp
 SRCS:=$(addprefix $(ROOT_DIR)/,$(SRCS))
 OBJS:=$(addprefix $(OBJ_DIR),$(SRCS:%.cpp=%.o))

@@ -13,9 +13,12 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <string.h>
 
 #include <atomic>
 #include <functional>
+
+#define ERROR_S strerror(errno)
 
 #define NOW() ({\
     timeval __tv{};\
