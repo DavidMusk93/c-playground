@@ -2,37 +2,13 @@
 // Created by Steve on 8/11/2020.
 //
 
-#include <algorithm>
-#include <functional>
-#include <memory>
-#include <string>
-#include <thread>
-#include <atomic>
-#include <unordered_map>
-#include <unordered_set>
-#include <memory>
-#include <vector>
-
-#include <arpa/inet.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
-#include <poll.h>
-
+#include "notifier.h"
 #include "codec.h"
 #include "reader.h"
 #include "tool.h"
 #include "secure.h"
 
 Terminator terminator;
-
-#define THREAD_KERNEL_TAG(tag,state) LOG("@THREAD_KERNEL ("#tag ") " #state)
-#define THREAD_KERNEL_START(tag) THREAD_KERNEL_TAG(tag,START)
-#define THREAD_KERNEL_END(tag) THREAD_KERNEL_TAG(tag,END)
 
 class RemoteReader:public Reader{
 #define TAG "(RELAY)"
@@ -175,152 +151,93 @@ private:
 #undef TAG
 };
 
-class TopicManager{
-public:
-    using consumer_t=std::function<bool(const void*,size_t)>;
-    using consumer_ptr=std::shared_ptr<consumer_t>;
-
-    void subscribe(const std::vector<std::string>&topics,const consumer_ptr&ptr){
-        for(auto&topic:topics){
-            table_[topic].push_back(ptr);
-        }
-    }
-
-    void publish(const std::string&topic,void*payload,size_t len){ //not thread safe
-        std::vector<consumer_ptr> t;
-        for(auto&fn:table_[topic]){
-            if((*fn)(payload,len)){
-                t.push_back(std::move(fn));
-            }
-        }
-        table_[topic]=t;
-    }
-
-    std::vector<consumer_ptr>&operator[](const std::string&topic){
-        return table_[topic];
-    }
-
-private:
-    std::unordered_map<std::string,std::vector<consumer_ptr>> table_;
-};
-
-
-void j2s(std::string&json){ //temporary
-    auto k=json.find('w'); //locate weight
-    if(k==std::string::npos){
-        return;
-    }
-    auto i=json.find(':',k);
-    auto j=json.find(',',k);
-    if(i==std::string::npos||j==std::string::npos){
-        return;
-    }
-    ++i;
-    json=json.substr(i,j-i);
-}
-
-class Notifier{
-public:
-    using T=TopicManager::consumer_t;
-
-    Notifier(){
+Notifier::Notifier(){
 //        reader_=std::make_unique<RandomReader>("/dev/urandom");
 //        reader_=std::make_unique<RemoteReader>(); //c++14 required
-        reader_.reset(new RemoteReader());
-        actor_=std::thread(&Notifier::Run,this); //danger if it is initialized in constructor member list
+    reader_.reset(new RemoteReader());
+    actor_=std::thread(&Notifier::Run,this); //danger if it is initialized in constructor member list
+}
+
+Notifier::~Notifier(){
+    if(actor_.joinable()){
+        terminator.trigger();
+        actor_.join();
+    }
+}
+
+void Notifier::Register(intptr_t key, T &&notify, const std::vector<std::string> &topics){
+    Spinlock lock{flag_};
+    if(subscriber_.count(key)){
+        return;
+    }
+    auto task=std::make_shared<T>(std::move(notify));
+    manager_.subscribe(topics,task);
+    subscriber_.insert({key,std::weak_ptr<T>(task)});
+    LOG("(NOTIFIER)subscriber count #%ld",subscriber_.size());
+}
+
+void Notifier::Run(){
+    THREAD_KERNEL_START(NOTIFIER);
+    struct pollfd pfd[2]={
+            {.fd=terminator.observeFd(),.events=POLLIN},
+            {.fd=reader_->GetObserveFd(),.events=POLLIN},
     };
-
-    ~Notifier(){
-        if(actor_.joinable()){
-            terminator.trigger();
-            actor_.join();
-        }
-    }
-
-    void Register(intptr_t key,T&& notify,const std::vector<std::string>&topics){
-        Spinlock lock{flag_};
-        if(subscriber_.count(key)){
-            return;
-        }
-        auto task=std::make_shared<T>(std::move(notify));
-        manager_.subscribe(topics,task);
-        subscriber_.insert({key,std::weak_ptr<T>(task)});
-        LOG("(NOTIFIER)subscriber count #%ld",subscriber_.size());
-    }
-
-protected:
-    void Run(){
-        THREAD_KERNEL_START(NOTIFIER);
-        struct pollfd pfd[2]={
-                {.fd=terminator.observeFd(),.events=POLLIN},
-                {.fd=reader_->GetObserveFd(),.events=POLLIN},
-        };
-        int nfds{};
-        for(;;){
-            POLL(nfds,poll,pfd,2,-1);
+    int nfds{};
+    for(;;){
+        POLL(nfds,poll,pfd,2,-1);
 //            ERROR_RETURN(nfds==-1,,{exit(1);/*force quit*/},"poll: %s",ERROR_S);
 //            if(nfds==0){
 //                continue;
 //            }
-            if(pfd[0].revents&POLLIN){
-                break;
-            }
-            auto&fd=pfd[1].fd;
-            unsigned long x{};
-            read(fd,&x,sizeof(x));
-            auto output=Codec::Decode(x);
-            std::vector<std::shared_ptr<T>> tasks;
-            {
-                Spinlock lock(flag_);
-                std::vector<intptr_t> invalid;
-                for(auto&p:subscriber_){
-                    if(!p.second.lock()){ /*try promotion*/
+        if(pfd[0].revents&POLLIN){
+            break;
+        }
+        auto&fd=pfd[1].fd;
+        unsigned long x{};
+        read(fd,&x,sizeof(x));
+        auto output=Codec::Decode(x);
+        std::vector<std::shared_ptr<T>> tasks;
+        {
+            Spinlock lock(flag_);
+            std::vector<intptr_t> invalid;
+            for(auto&p:subscriber_){
+                if(!p.second.lock()){ /*try promotion*/
 //                    subscriber_.erase(p.first);
-                        invalid.push_back(p.first);
-                    }
-                }
-                for(auto&k:invalid){
-                    LOG("erase handler %p",reinterpret_cast<void*>(k));
-                    subscriber_.erase(k);
-                }
-                auto&ref=manager_[output.topic];
-                if(ref.empty()){
-                    LOG("(NOTIFIER)no subscriber,drop '%s'",output.payload.c_str());
-                    continue;
-                }
-                tasks.swap(ref);
-            }
-            std::vector<std::shared_ptr<T>> valid;
-//            j2s(output.payload);
-            LOG("(NOTIFIER)task count #%ld",tasks.size());
-            for(auto&p:tasks){
-                if((*p)(output.payload.data(),output.payload.size())){ /*real publish*/
-                    valid.push_back(std::move(p));
+                    invalid.push_back(p.first);
                 }
             }
-            if(valid.empty()){
+            for(auto&k:invalid){
+                LOG("erase handler %p",reinterpret_cast<void*>(k));
+                subscriber_.erase(k);
+            }
+            auto&ref=manager_[output.topic];
+            if(ref.empty()){
+                LOG("(NOTIFIER)no subscriber,drop '%s'",output.payload.c_str());
                 continue;
             }
-            Spinlock lock(flag_);
-            auto&ref=manager_[output.topic];
-            for(auto&k:valid){
-                ref.push_back(std::move(k));
+            tasks.swap(ref);
+        }
+        std::vector<std::shared_ptr<T>> valid;
+//            j2s(output.payload);
+        LOG("(NOTIFIER)task count #%ld",tasks.size());
+        for(auto&p:tasks){
+            if((*p)(output.payload.data(),output.payload.size())){ /*real publish*/
+                valid.push_back(std::move(p));
             }
         }
-        THREAD_KERNEL_END(NOTIFIER);
+        if(valid.empty()){
+            continue;
+        }
+        Spinlock lock(flag_);
+        auto&ref=manager_[output.topic];
+        for(auto&k:valid){
+            ref.push_back(std::move(k));
+        }
     }
+    THREAD_KERNEL_END(NOTIFIER);
+}
 
-private:
-//    RandomReader rand_{"/dev/urandom"};
-    std::unique_ptr<Reader> reader_;
-    std::unordered_map<intptr_t,std::weak_ptr<T>> subscriber_;
-//    std::unordered_map<intptr_t,T> callback_;
-    TopicManager manager_;
-    std::thread actor_;
-    std::atomic_flag flag_=ATOMIC_FLAG_INIT;
-};
-
-static std::vector<std::string> parseTopic(const std::string&uri){
+std::vector<std::string> parseTopic(const std::string&uri){
     std::vector<std::string> res;
     char k[16],v[16];
     auto i=uri.find('?');

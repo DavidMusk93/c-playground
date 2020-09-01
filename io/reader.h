@@ -62,8 +62,6 @@ code,\
 {close(sock);sock=-1;},\
 "setsockopt(" #name ") error: %s",ERROR_S)
 
-#define ERROR_S strerror(errno)
-
 class RandomReader:public Reader{
 public:
     RandomReader(const std::string&file):Reader(),i_(kBufferSize){
