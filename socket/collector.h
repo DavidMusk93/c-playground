@@ -129,7 +129,7 @@ public:
         if(Connect()){
             ERROR_RETURN((epoll_handler_=epoll_create1(0))==-1,,,1);
             ERROR_RETURN((timer_fd_=timerfd_create(CLOCK_REALTIME,O_NONBLOCK|O_CLOEXEC))==-1,,,1);
-            if(getenv("USE_DB")/*dynamic loading*/){
+            if(ENABLE_DB/*dynamic loading*/){
                 database_.reset(ConnectorFactory::create(ConnectorFactory::MYSQL));
             }
             if(database_&&database_->ready()){
@@ -158,12 +158,13 @@ public:
         return true;
     }
     void addPayload(std::string payload){
+#define READY_CHAR 'R'
 //        payloads_.offer(std::move(payload));
         {
             Spinlock spinlock{flag};
             pv.push_back(std::move(payload));
         }
-        char c='R';
+        char c=READY_CHAR;
         write(PRODUCER_HANDLER,&c,1);
     }
 
@@ -183,6 +184,8 @@ do{\
 //        payloads_.finish();
         terminator_.trigger();
 //        JOIN(producer_);
+        char quit[]="QUIT";
+        write(PRODUCER_HANDLER,quit,sizeof(quit));
         JOIN(consumer_);
 #undef JOIN
     }
@@ -236,6 +239,9 @@ end:
 //            LOG("(CONSUMER)payload count:%d",FdHelper::UnreadSize(CONSUMER_HANDLER));
             char c{};
             read(CONSUMER_HANDLER,&c,1); /*block read*/
+            if(c!=READY_CHAR){
+                break;
+            }
 //            FdHelper::Drain(CONSUMER_HANDLER); /*flush consumer handler*/
 //            std::string payload;
 //            if(!payloads_.poll(payload)){

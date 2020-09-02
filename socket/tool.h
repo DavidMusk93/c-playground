@@ -19,6 +19,9 @@
 #include <atomic>
 #include <functional>
 
+#define ENABLE_DB     getenv("ENABLE_DB")
+#define ENABLE_LOGGER getenv("ENABLE_LOGGER")
+
 #define ERROR_S strerror(errno)
 
 #define NOW() ({\

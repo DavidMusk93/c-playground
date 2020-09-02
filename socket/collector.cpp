@@ -159,7 +159,9 @@ int main(int argc,char*argv[]){
         return 1;
     }
     auto logger=Logger::CreateLogger<10,1>("/tmp/collector.log");
-    logger.redirect().detach();
+    if(ENABLE_LOGGER){
+        logger.redirect().detach();
+    }
 //    const char*ports=argv[1];
 //    LOG("%s",ports);
 //    for(auto&i:split<int>(ports,',',[](const std::string&s)->int{return std::stoi(s);})){

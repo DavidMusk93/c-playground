@@ -23,7 +23,7 @@ public:
 
 private:
 //    template<size_t N,size_t MB> /*compiler can not recognize this CTOR*/
-    Logger(const std::string&logfile,size_t N,size_t MB):handler_{nullptr},fds_{-1,-1},i_{0}{
+    Logger(const std::string&logfile,size_t N,size_t MB,std::string buffer):handler_{nullptr},fds_{-1,-1},i_{0},buffer_(std::move(buffer)){
         filesize_=MB*kMb;
         logfiles_.resize(N);
         logbase_=logfile;
@@ -38,10 +38,10 @@ public:
     Logger&redirect();
     void detach();
 
-    template<size_t N,size_t MB>
+    template<size_t N,size_t MB,size_t BL=1024/*buffer length*/>
     static Logger CreateLogger(const std::string&logfile){
-        static_assert(N&&MB&&N<=10&&MB<=20);
-        return Logger{logfile,N,MB};
+        static_assert(N&&MB&&BL&&N<=10&&MB<=20&&BL<=1024);
+        return Logger{logfile,N,MB,std::string(BL,0)};
     }
 
 protected:
@@ -57,6 +57,7 @@ private:
     std::atomic<State> state_;
     std::vector<std::string> logfiles_;
     std::string logbase_;
+    std::string buffer_;
 
     static constexpr const size_t kMb=1024*1024;
 };

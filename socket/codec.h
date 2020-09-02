@@ -34,6 +34,9 @@ public:
         std::string payload;
         std::string topic;
         Output&load(u64 x);
+        static std::string RetrieveTopic(u64 x){
+            return std::to_string(static_cast<u8>(x>>IP_OFFSET));
+        }
     };
 
 public:

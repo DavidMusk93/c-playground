@@ -122,6 +122,10 @@ protected:
                             ERROR_RETURN4(epoll_ctl(epollfd,EPOLL_CTL_DEL,fd,nullptr)==-1,,,1);
                             continue;
                         }
+                        if(filter_&&!filter_(Codec::Output::RetrieveTopic(x))){
+                            LOG(TAG "no subscriber,drop payload");
+                            continue;
+                        }
                         int ub=FdHelper::UnreadSize(GetObserveFd());
                         if(ub<128){ /*avoid filling up the pipe*/
                             auto nw=write(fds_[FdHelper::kPipeWrite],&x,sizeof(x));
@@ -142,11 +146,17 @@ protected:
         THREAD_KERNEL_END(RELAY);
     }
 
+public:
+    void registerFilter(Filter &&filter) override {
+        filter_.swap(filter);
+    }
+
 private:
     int fds_[2];
     std::atomic<State> state_;
     std::atomic<int> x_;
     std::thread actor_;
+    Filter filter_;
 #undef SOCKADDR_EX
 #undef TAG
 };
@@ -155,6 +165,7 @@ Notifier::Notifier(){
 //        reader_=std::make_unique<RandomReader>("/dev/urandom");
 //        reader_=std::make_unique<RemoteReader>(); //c++14 required
     reader_.reset(new RemoteReader());
+    reader_->registerFilter([this](const std::string&topic)->bool{return !manager_[topic].empty();});
     actor_=std::thread(&Notifier::Run,this); //danger if it is initialized in constructor member list
 }
 
@@ -254,12 +265,12 @@ std::vector<std::string> parseTopic(const std::string&uri){
     return res;
 }
 
-int main(){
-    std::string uri="ws://192.168.10.101:9001?w1=182&w2=184";
-    for(auto&i:parseTopic(uri)){
-        LOG("%s",i.c_str());
-    }
-    std::string json=R"({"topic":"%s","weight":256,"id":"%s"})";
-    j2s(json);
-    LOG("%s",json.c_str());
-}
+//int main(){
+//    std::string uri="ws://192.168.10.101:9001?w1=182&w2=184";
+//    for(auto&i:parseTopic(uri)){
+//        LOG("%s",i.c_str());
+//    }
+//    std::string json=R"({"topic":"%s","weight":256,"id":"%s"})";
+//    j2s(json);
+//    LOG("%s",json.c_str());
+//}

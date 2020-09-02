@@ -17,6 +17,7 @@ Logger::Logger(Logger &&other) {
     state_.store(other.state_);
     logfiles_.swap(other.logfiles_);
     logbase_.swap(other.logbase_);
+    buffer_.swap(other.buffer_);
 }
 
 Logger&Logger::redirect() {
@@ -46,13 +47,15 @@ void Logger::Run() {
     struct pollfd pfd{.fd=fds_[FdHelper::kPipeRead],.events=POLLIN};
     state_.store(State::RUNNING,std::memory_order_release);
     int nfds{},nr{},count{};
-    char buf[1024];
+    char*buf=&buffer_[0];
+    const int BL=buffer_.size();
     Next();
     LOG("(LOGGER)%s,%zu,%#zx",logbase_.c_str(),logfiles_.size(),filesize_);
     for(;;){
         POLL(nfds,poll,&pfd,1,-1);
-        nr=read(pfd.fd,buf,sizeof(buf));
+        nr=read(pfd.fd,buf,BL);
         fprintf(handler_,"%.*s",nr,buf);
+        fflush(handler_); /*key to inspect realtime log*/
         if(++count>=FREQUENCY){
             count=0;
             size_t n=ftell(handler_);
@@ -61,6 +64,7 @@ void Logger::Run() {
             }
         }
     }
+#undef FREQUENCY
 }
 
 void Logger::Next() {

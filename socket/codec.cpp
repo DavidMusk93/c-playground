@@ -60,7 +60,7 @@ Codec::Output & Codec::Output::load(u64 x) {
     char buf[64];
     auto error=static_cast<u8>(x>>ERROR_OFFSET);
     auto block=x&BLOCK_MASK;
-    topic=std::to_string(static_cast<u8>((x>>IP_OFFSET)&IP_MASK));
+    topic=RetrieveTopic(x);
     sprintf(buf,PATTERN,
             topic.c_str(),
             error?atoi(BAD):static_cast<short>((x>>WEIGHT_OFFSET)&WEIGHT_MASK),

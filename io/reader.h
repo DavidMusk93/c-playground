@@ -19,6 +19,8 @@ public:
     using u32=unsigned int;
     using u64=unsigned long;
 
+    using Filter=std::function<bool(const std::string&)>;
+
 public:
     Reader():fd_(-1){}
     virtual ~Reader()=default;
@@ -27,7 +29,7 @@ public:
     virtual short GetShort()=0;
     virtual int GetInt()=0;
     virtual int GetObserveFd()=0;
-
+    virtual void registerFilter(Filter&&filter){}
 protected:
     int&GetFd(){
         return fd_;

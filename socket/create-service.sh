@@ -16,6 +16,7 @@ After=network.target
 [Service]
 Type=simple
 User=$USER
+Environment="ENABLE_LOGGER=1"
 
 PIDFile=/tmp/$BASE.pid
 ExecStart=$RUNNABLE $*
