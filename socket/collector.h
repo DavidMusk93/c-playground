@@ -30,7 +30,7 @@ namespace sun{
             data_.push_back(/*std::forward<T>(t)*/std::move(t));
             cv_.notify_one();
         }
-        bool poll(T&t){
+        bool poll(T&t){ /*slow consumer*/
             LOCK();
             cv_.wait(lock,[this](){return finish_||!data_.empty();});
             if(finish_){
@@ -112,6 +112,8 @@ public:
 //        char buf[64]{};
 //        int len{};
 //    };
+#define PRODUCER_HANDLER event_handler_[0]
+#define CONSUMER_HANDLER event_handler_[1]
 
     enum class State:char{
         UNINITIALIZED,
@@ -120,7 +122,7 @@ public:
         DONE,
     };
 
-    Collector(const std::string&server_ip,short server_port):fd_(-1),epoll_handler_(-1){
+    Collector(const std::string&server_ip,short server_port):fd_(-1),epoll_handler_(-1),event_handler_{-1,-1}{
         state_.store(State::UNINITIALIZED,std::memory_order_relaxed);
         MAKE_SOCKADDR_IN(server,inet_addr(server_ip.c_str()),htons(server_port));
         server_address_=server;
@@ -135,6 +137,7 @@ public:
             }else{
                 database_.reset();
             }
+            socketpair(AF_UNIX,SOCK_STREAM,0,event_handler_);
             state_.store(State::READY,std::memory_order_relaxed);
         }
     }
@@ -155,7 +158,13 @@ public:
         return true;
     }
     void addPayload(std::string payload){
-        payloads_.offer(std::move(payload));
+//        payloads_.offer(std::move(payload));
+        {
+            Spinlock spinlock{flag};
+            pv.push_back(std::move(payload));
+        }
+        char c='R';
+        write(PRODUCER_HANDLER,&c,1);
     }
 
     void loop(){
@@ -171,7 +180,7 @@ public:
 do{\
     if(x.joinable()){x.join();}\
 }while(0)
-        payloads_.finish();
+//        payloads_.finish();
         terminator_.trigger();
 //        JOIN(producer_);
         JOIN(consumer_);
@@ -221,14 +230,29 @@ end:
 #endif
         Counter counter;
         for(;;){
-            std::string payload;
-            if(!payloads_.poll(payload)){
+            if(state_.load(std::memory_order_acquire)==State::DONE){
                 break;
             }
-            counter.tick();
-            if(state_.load(std::memory_order_acquire)==State::READY){
-                TIMETHIS(send(fd_,payload.data(),payload.size(),0/*MSG_MORE*/));
+//            LOG("(CONSUMER)payload count:%d",FdHelper::UnreadSize(CONSUMER_HANDLER));
+            char c{};
+            read(CONSUMER_HANDLER,&c,1); /*block read*/
+//            FdHelper::Drain(CONSUMER_HANDLER); /*flush consumer handler*/
+//            std::string payload;
+//            if(!payloads_.poll(payload)){
+//                break;
+//            }
+            {
+                Spinlock spinlock{flag};
+                cv.swap(pv); /*fast swap*/
+                if(cv.empty()){continue;}
             }
+            for(auto&payload:cv){
+                counter.tick();
+                if(state_.load(std::memory_order_acquire)==State::READY){
+                    TIMETHIS(send(fd_,payload.data(),payload.size(),0/*MSG_MORE*/));
+                }
+            }
+            cv.clear(); /*clear consumer container*/
         }
     }
 
@@ -253,11 +277,14 @@ private:
     int timer_fd_;
     unsigned long retry_count{};
     std::atomic<State> state_;
-    sun::Queue<std::string> payloads_;
+//    sun::Queue<std::string> payloads_; /*slowly*/
     std::unordered_set<Connection::Handler> handlers_;
     Terminator terminator_;
     std::thread /*producer_,*/consumer_;
     std::unique_ptr<Connector> database_;
+    std::vector<std::string> cv,pv;
+    std::atomic_flag flag=ATOMIC_FLAG_INIT;
+    int event_handler_[2];
 };
 
 #endif //C4FUN_COLLECTOR_H

@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <string.h>
+#include <sys/socket.h>
 
 #include <atomic>
 #include <functional>
@@ -145,6 +146,13 @@ public:
         ioctl(fd,FIONREAD,&size);
         return size;
     }
+
+//    static void Drain(int sock){
+//        for(;;){
+//            ssize_t nr=recv(sock,nullptr,0,MSG_DONTWAIT); /*undefined action*/
+//            if(nr<=0){break;}
+//        }
+//    }
 
     static void Close(int&fd){
         if(fd!=-1){
