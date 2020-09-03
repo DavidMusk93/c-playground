@@ -26,8 +26,10 @@ public:
         Cleaner cleaner{[&sock](){close(sock);}};
         struct sockaddr_in addr={.sin_family=AF_INET,.sin_port=htons(PORT),.sin_addr={INADDR_ANY},};
         int REUSE=1;
+        int QUICKACK=1;
         SETSOCKOPT(sock,SOL_SOCKET,SO_REUSEADDR,REUSE,);
         SETSOCKOPT(sock,SOL_SOCKET,SO_REUSEPORT,REUSE,);
+        SETSOCKOPT(sock,IPPROTO_IP,TCP_QUICKACK,QUICKACK,); /*acks are sent immediately*/
         ERROR_RETURN(bind(sock,SOCKADDR_EX(addr))==-1,,,1);
         ERROR_RETURN(listen(sock,BACKLOG)==-1,,,1);
         cleaner.cancel();

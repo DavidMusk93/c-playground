@@ -23,6 +23,7 @@
 #include <string.h>
 #include <poll.h>
 #include <fcntl.h>
+#include <netinet/tcp.h> /*for TCP_QUICKACK & TCP_NODELAY*/
 
 //#include "time/now.h"
 #include "tool.h"

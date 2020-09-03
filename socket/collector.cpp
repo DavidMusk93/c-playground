@@ -40,9 +40,11 @@ void Collector::HandlerInterrupt(int fd, void *user_data) {
 
 bool Collector::Connect() {
     if(fd_==-1){ /*to reuse socket resource*/
+        int NODELAY=1;
         ERROR_RETURN((fd_=socket(AF_INET,SOCK_STREAM,0))==-1,false,,1);
         struct timeval tv{CONNECT_TIMEOUT,0};
         SETSOCKOPT(fd_,SOL_SOCKET,SO_SNDTIMEO,tv,false);
+        SETSOCKOPT(fd_,IPPROTO_IP,TCP_NODELAY,NODELAY,false); /*disable the Nagle algorithm*/
     }
 //    Cleaner/*go defer alike*/ cleaner{[this]{close(fd_);}};
     ERROR_RETURN(connect(fd_,SOCKADDR_EX(server_address_))==-1,false,,1);
