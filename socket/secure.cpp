@@ -16,21 +16,18 @@ typedef union{
     Reader::u8 p[sizeof(Reader::u32)];
 } IU;
 
-static FUNCTION_UNUSED void uniswap(u8*p){
-    IU u1{},u2{};
-    memcpy(u1.p,p,4);
-    memcpy(u2.p,p+8,4);
-    u1.x^=u2.x;
-    memcpy(p,u1.p,4);
-}
+//static FUNCTION_UNUSED void uniswap(u8*p){
+//    IU u1{},u2{};
+//    memcpy(u1.p,p,4);
+//    memcpy(u2.p,p+8,4);
+//    u1.x^=u2.x;
+//    memcpy(p,u1.p,4);
+//}
 
-std::string Secure::Encrypt(const void *data, size_t len/*8 for now*/) {
-//#define RANDOM 4
+std::string Secure::Encrypt(const void *data, size_t len) {
     std::string res=SECRET;
     res.resize(kDataLen);
     memcpy(&res[SECRET_LEN+1],data,len); /*load real data*/
-//    Ring<kDataLen-1> ring;
-//    void*p=ring.next();
     auto p=reinterpret_cast<u8*>(&res[0]);
     u8 mask=entropy.fetch<u8>(); /*fetch random u8*/
     p[SECRET_LEN]=mask;

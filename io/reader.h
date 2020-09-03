@@ -48,22 +48,6 @@ do{\
     }\
 }while(0)
 
-#define ERROR_RETURN4(expr,code,cleanup,err) \
-do{\
-    if(expr){\
-        cleanup\
-        LOG("%s: %s",#expr,sizeof(#err)==1?"":ERROR_S);\
-        return code;\
-    }\
-}while(0)
-
-#define SETSOCKOPT(sock,level,name,val,code) \
-ERROR_RETURN(\
-setsockopt(sock,level,name,&val,sizeof(val))!=0,\
-code,\
-{close(sock);sock=-1;},\
-"setsockopt(" #name ") error: %s",ERROR_S)
-
 class RandomReader:public Reader{
 public:
     RandomReader(const std::string&file):Reader(),i_(kBufferSize){
@@ -120,5 +104,7 @@ private:
 
     static constexpr int kBufferSize=sizeof(buf_);
 };
+
+#undef ERROR_RETURN
 
 #endif //C4FUN_READER_H

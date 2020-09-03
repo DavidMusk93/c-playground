@@ -21,7 +21,15 @@ namespace sun::time{
 
     const char*format(const timeval&tv){
         static __thread char buf[64];
-        sprintf(buf,"%ld.%06ld",tv.tv_sec,tv.tv_usec);
+        struct tm tm{};
+        localtime_r(&tv.tv_sec,&tm);
+//        auto n=strftime(buf,sizeof(buf),"%x-%X",&tm);
+//        sprintf(buf+n-1/*n contains null-terminated*/,".%06ld",tv.tv_usec);
+        auto*ptr=&tm;
+        sprintf(buf,"%4d/%02d/%02d-%02d:%02d:%02d.%06ld",
+                ptr->tm_year+1900,ptr->tm_mon+1,ptr->tm_mday,
+                ptr->tm_hour,ptr->tm_min,ptr->tm_sec,
+                tv.tv_usec);
         return buf;
     }
 }

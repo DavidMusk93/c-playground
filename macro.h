@@ -6,12 +6,18 @@
 #define C4FUN_MACRO_H
 
 #include <stdio.h>
+#include <errno.h>
+#include <error.h>
+#include <string.h>
+#include <stdlib.h>
 
 #define MAIN() \
 int main()
 
 #define MAIN_EX(argc, argv) \
 int main(int argc, const char *argv[])
+
+#define ERROR_S strerror(errno)
 
 #define WHERE_FALSE while(0)
 

@@ -60,6 +60,7 @@ __TRIVIAL()
 
 #define __ATTRIBUTE(keyword) __attribute__((keyword))
 #define FUNCTION_UNUSED __ATTRIBUTE(unused)
+#define TYPE_PACKED __ATTRIBUTE(packed)
 
 namespace sun/*nested namespace definition is a C++1z extension*/ {
     namespace time {
@@ -226,6 +227,40 @@ public:
 
 private:
     Closure final_;
+};
+
+class Recorder{
+public:
+    Recorder(std::string tag):tag_(std::move(tag)),emit_(false){
+        ts_=SECONDS;
+    }
+    Recorder(Recorder&&other){
+//        tag_.swap(other.tag_);
+//        ts_=other.ts_;
+        *this=std::move(other);
+    }
+    Recorder&operator=(Recorder&&other) noexcept{
+        tag_.swap(other.tag_);
+        ts_=other.ts_;
+        emit_=other.emit_;
+        return *this;
+    }
+    ~Recorder(){
+        Done();
+    }
+    void Done(){
+        if(!emit_){
+            LOG("@RECORDER<%s> cost %f(s)",tag_.c_str(),SECONDS-ts_);
+            emit_=true;
+        }
+    }
+    void Cancel(){
+        emit_=true;
+    }
+private:
+    std::string tag_;
+    double ts_;
+    bool emit_;
 };
 
 #endif //C4FUN_TOOL_H

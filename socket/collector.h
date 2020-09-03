@@ -236,17 +236,11 @@ end:
             if(state_.load(std::memory_order_acquire)==State::DONE){
                 break;
             }
-//            LOG("(CONSUMER)payload count:%d",FdHelper::UnreadSize(CONSUMER_HANDLER));
             char c{};
             read(CONSUMER_HANDLER,&c,1); /*block read*/
             if(c!=READY_CHAR){
                 break;
             }
-//            FdHelper::Drain(CONSUMER_HANDLER); /*flush consumer handler*/
-//            std::string payload;
-//            if(!payloads_.poll(payload)){
-//                break;
-//            }
             {
                 Spinlock spinlock{flag};
                 cv.swap(pv); /*fast swap*/

@@ -8,6 +8,8 @@
 #include <functional>
 #include <string>
 
+#include "codec.h"
+
 template<size_t N>
 struct Ring{
 public:
@@ -33,7 +35,7 @@ public:
     }
 
 private:
-    static constexpr const size_t kDataLen=4+8;
+    static constexpr const size_t kDataLen=4+Codec::kDataSize;
     static constexpr const char*SECRET="SUN";
     static constexpr const size_t SECRET_LEN=3;
 };

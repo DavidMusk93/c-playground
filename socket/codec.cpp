@@ -40,6 +40,14 @@ Codec::Input & Codec::Input::parseBlock(const char *data) {
     return *this;
 }
 
+Codec::Input &Codec::Input::parseSerial(const char *data) {
+//    serial=atoi(data);
+    char*end{};
+    auto l=strtoull(data,&end,10);
+    serial=static_cast<Codec::u32>(l);
+    return *this;
+}
+
 static const char*i2s(Codec::u32 x){
 #define LEN 4 /*sizeof(int)*/
     static __thread char buf[16];
@@ -55,13 +63,14 @@ static const char*i2s(Codec::u32 x){
 #undef LEN
 }
 
-Codec::Output & Codec::Output::load(u64 x) {
-#define PATTERN "{\"topic\":\"%s\",\"weight\":%d,\"id\":\"%s\"}"
+Codec::Output & Codec::Output::load(Codec::Data data) {
+#define PATTERN "{\"serial\":%u,\"topic\":\"%s\",\"weight\":%d,\"id\":\"%s\"}"
     char buf[64];
+    auto x=data.b;
     auto error=static_cast<u8>(x>>ERROR_OFFSET);
     auto block=x&BLOCK_MASK;
     topic=RetrieveTopic(x);
-    sprintf(buf,PATTERN,
+    sprintf(buf,PATTERN,data.a,
             topic.c_str(),
             error?atoi(BAD):static_cast<short>((x>>WEIGHT_OFFSET)&WEIGHT_MASK),
             block?i2s(x&BLOCK_MASK):"NONE");
@@ -69,16 +78,16 @@ Codec::Output & Codec::Output::load(u64 x) {
     return *this;
 }
 
-Codec::u64 Codec::Encode(const Input &input) {
+Codec::Data Codec::Encode(const Input &input) {
     u64 x{};
     x|=static_cast<u64>(input.error)<<ERROR_OFFSET;
     x|=static_cast<u64>(input.ip)<<IP_OFFSET;
     x|=static_cast<u64>(input.weight)<<WEIGHT_OFFSET;
     x|=input.block;
-    return x;
+    return {.a=input.serial,.b=x};
 }
 
-Codec::Output Codec::Decode(u64 x) {
+Codec::Output Codec::Decode(Codec::Data x) {
     return Output{}.load(x);
 }
 

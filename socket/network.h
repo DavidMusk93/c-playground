@@ -54,13 +54,18 @@ name.sin_port=port
 
 class Connection{
 public:
+    using on_recv_t=std::function<void(int,void*)>;
+    using on_send_t=std::function<void(int,void*)>;
+    using on_close_t=std::function<void(int&)>;
     struct Callback{
-        std::function<void(int,void*)> on_recv;
-        std::function<void(int,void*)> on_send;
-        std::function<void(int&)> on_close;
+        on_recv_t on_recv;
+        on_send_t on_send;
+        on_close_t on_close;
     };
 //    using Callback=std::function<void(int,void*)>;
     using Handler=std::shared_ptr<Connection>;
+    using Ptr=Handler;
+    using Set=std::unordered_set<Ptr>;
     Connection():Connection(-1){}
     Connection(int fd):fd_(fd){}
     Connection&operator=(Connection&&other)noexcept{
@@ -76,6 +81,20 @@ public:
     int epollRegister(int epoll_handler,int events) const;
     int epollUnregister(int epoll_handler);
     void registerCallback(Callback callback,void*user_data);
+
+#define REGISTER_CALLBACK(x) \
+callback_.x.swap(x); \
+return this;
+    Connection*registerOnRecv(on_recv_t on_recv,void*user_data=nullptr){
+        user_data_=user_data;
+        REGISTER_CALLBACK(on_recv);
+    }
+    Connection*registerOnSend(on_send_t on_send){
+        REGISTER_CALLBACK(on_send);
+    }
+    Connection*registerOnClose(on_close_t on_close){
+        REGISTER_CALLBACK(on_close);
+    }
     void eventTrigger(int epoll_handler,int events);
     void cancel(){
         fd_=-1;
@@ -88,11 +107,21 @@ public:
         }
     }
 
+    std::string&Buffer(){
+        return buffer_;
+    }
+
+    size_t&ReadBytes(){
+        return read_bytes_;
+    }
+
 private:
     int fd_;
     bool legal_{false};
     Callback callback_;
     void*user_data_;
+    std::string buffer_;
+    size_t read_bytes_{0};
 };
 
 class Server{

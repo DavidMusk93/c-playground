@@ -21,7 +21,7 @@ void Collector::HandleGroupMsg(int fd, void *user_data){
     LOG(TAG "receive '%.*s' from " SOCKADDR_FMT,nr,buf,SOCKADDR_OF(from));
     auto ip=inet_ntoa(from.sin_addr);
     auto input=Codec::Input{};
-    input.parseIp(ip).parseWeight(buf).parseBlock(buf);
+    input.parseIp(ip).parseWeight(buf).parseBlock(buf).parseSerial(buf);
 //    collector->addPayload(std::string(buf,nr));
     auto x=Codec::Encode(input);
     collector->addPayload(Secure::Encrypt(&x,sizeof(x)));
