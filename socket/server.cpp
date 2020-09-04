@@ -66,7 +66,7 @@ void Server::run() {
 //                                socklen_t len=sizeof(peer);
                                 char buf[1024];
 //                                int nr=recvfrom(fd,buf,sizeof(buf),0,(struct sockaddr*)&peer,&len);
-                                int nr=recv(fd,buf,sizeof(buf),0);
+                                int nr=recv(fd,buf,sizeof(buf),0); /*until EAGAIN is returned by either read or write*/
                                 LOG("(%p)received '%.*s'",p,nr,buf);
                             }
                             ,nullptr

@@ -84,7 +84,7 @@ protected:
         Connection::Handler handler;
         ERROR_RETURN((epollfd=epoll_create1(0))==-1,,,1);
         auto handle_message=[this,epollfd,&handlers](int fd,void*)->void{
-            LOG(TAG "tcp unread file size:%d",FdHelper::UnreadSize(fd));
+            LOG(TAG "tcp unread size:%d",FdHelper::UnreadSize(fd));
             Recorder r1{"RECEIVE SINGLE MESSAGE"};
             auto handler=handlers[fd];
             auto&buf=handler->Buffer();
@@ -121,7 +121,7 @@ protected:
             LOG(TAG "new connection from %s:%d",inet_ntoa(peer.sin_addr),ntohs(peer.sin_port));
             /*register active fd*/
             auto handler=std::make_shared<Connection>(sock);
-            if(handler->epollRegister(epollfd,EPOLLIN|EPOLLET|EPOLLHUP|EPOLLRDHUP)==0/*error prone*/){
+            if(handler->epollRegister(epollfd,EPOLLIN|/*EPOLLET|EPOLLHUP|*/EPOLLRDHUP)==0/*error prone*/){
                 handler->Buffer()=Secure::CreateBuffer();
                 handler->registerOnRecv(handle_message)->registerOnClose([&handlers](int&fd){
                     LOG(TAG "#%d remote close",fd);

@@ -152,7 +152,7 @@ public:
             return false;
         }
         auto handler=std::make_shared<Connection>(fd);
-        ERROR_RETURN(handler->epollRegister(epoll_handler_,EPOLLIN|EPOLLET|EPOLLRDHUP)==-1,false,,0);
+        ERROR_RETURN(handler->epollRegister(epoll_handler_,EPOLLIN|/*EPOLLET|*/EPOLLRDHUP)==-1,false,,0);
         handler->registerCallback({std::move(on_recv),nullptr,[handler,this](int&){handlers_.erase(handler);}},this);
         handlers_.insert(handler);
         return true;
