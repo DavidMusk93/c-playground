@@ -55,4 +55,14 @@ if(error){\
 
 #define NL '\n'
 
+#ifdef __cplusplus
+#define __NULL nullptr
+#else
+#define __NULL NULL
+#endif
+
+#define REVOKE_OUTPUT_BUFFER() \
+setbuf(stdout,__NULL);\
+setbuf(stderr,__NULL)
+
 #endif //C4FUN_MACRO_H

@@ -19,6 +19,13 @@ void printer(Args&&...args){
     (std::cout<<...<<args/*(init op...op pack)*/)<<'\n';
 }
 
+template<typename...Args>
+void reverse_print(Args...args){ /*http://purecpp.org/detail?id=2168*/
+    int trivial{};
+    ((std::cout<<args<<' ',trivial)=...=0);
+    std::cout<<std::endl;
+}
+
 template<typename T,typename...Args>
 void push_back_vec(std::vector<T>&v,Args&&...args){
     static_assert((std::is_constructible_v<T,Args>&&...));
@@ -51,4 +58,5 @@ MAIN(){
     LOG("");
     static_assert(bswap<std::uint16_t>(0x1234u)==0x3412u);
     static_assert(bswap<std::uint64_t>(0x0123456789abcdefULL)==0xefcdab8967452301ULL);
+    reverse_print("a","b","c");
 }

@@ -1,5 +1,6 @@
 //
 // Created by Steve on 8/18/2020.
+// @ref http://purecpp.org/detail?id=2182
 //
 
 #include <functional>
@@ -22,6 +23,23 @@ constexpr auto compose(Ops&&...ops){
     };
 }
 
+template<typename L,typename R>
+decltype(auto) operator|(L&&l,R&&r){
+    return compose(std::forward<L>(l),std::forward<R>(r));
+}
+
+template<typename Op>
+struct pipeline{
+    pipeline(Op op):op(std::move(op)){}
+
+    template<class...Args>
+    decltype(auto) operator()(Args&&...args) const {
+        return op(std::forward<Args>(args)...);
+    }
+
+    Op op;
+};
+
 #include "macro.h"
 
 int f(int x){
@@ -37,6 +55,9 @@ int h(int x){
 }
 
 MAIN(){
-    auto composite=compose(f,g,h);
+//    auto composite=compose(f,g,h);
+    auto composite=pipeline(f)|g|h; /*http://eel.is/c++draft/over.match.oper#3.2*/
     LOG("%d",composite(2));
+    auto m=[](int i){return i+1;}|[](int i){return i+2;}|[](int i){return i+3;};
+    LOG("%d",m(4));
 }
