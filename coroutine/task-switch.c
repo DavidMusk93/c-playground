@@ -16,7 +16,8 @@ static int switches;
 static void fn(int n){
     int m=0;
     while(1){
-        if(++m%100==0){
+        if(++m%1000000==0){
+            m=0;
             putchar('.');
             fflush(stdout);
         }

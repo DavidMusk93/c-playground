@@ -19,7 +19,7 @@ void foo(void*p1,void*p2){
     LOG("yield");
     swapcontext(p2,p1);
     FN_TAG(END);
-    setcontext(p1);
+//    setcontext(p1); /*redundant if uc_link is set*/
 }
 
 MAIN(){
@@ -30,7 +30,7 @@ MAIN(){
 //    setcontext(&uctx);
 //    LOG("%p,%p",(fn_t*)&foo,(fn_ptr_t)foo);
 //    LOG("%p,%p",(fn_t*)foo,(fn_ptr_t)&foo);
-    ucontext_t uc[2];
+    ucontext_t uc[2]={};
     char st[8192];
     getcontext(&uc[1]);
     uc[1].uc_link=&uc[0];
@@ -42,5 +42,6 @@ MAIN(){
     LOG("resume");
     swapcontext(&uc[0],&uc[1]);
     FN_TAG(END);
+    LOG("%#lx,%#lx",uc[0].uc_flags,uc[1].uc_flags);
     return 0;
 }
