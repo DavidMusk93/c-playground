@@ -1,0 +1,11 @@
+disassemble foo
+
+break foo
+r
+#go to callee
+s
+
+#first argument
+p *(int*)(-4+$rbp)
+#second argument
+p *(int*)(-8+$rbp)
