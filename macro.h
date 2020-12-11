@@ -57,6 +57,7 @@ if(error){\
 
 #ifdef __cplusplus
 #define __NULL nullptr
+#include "raii.h"
 #else
 #define __NULL NULL
 #endif

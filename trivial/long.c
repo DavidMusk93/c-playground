@@ -7,5 +7,6 @@
 MAIN(){
 #define u64 unsigned long
 #define S64_MAX 0x7fffffffffffffffL
-    LOG("%ld",S64_MAX);
+#define S64_MIN 0x8000000000000000L
+    LOG("%ld,%ld,%ld",S64_MAX,S64_MIN,S64_MIN*-1);
 }

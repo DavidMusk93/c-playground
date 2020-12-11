@@ -1,0 +1,4 @@
+*.tar.gz
+/logging-log4cxx
+.idea
+cmake-build-debug
