@@ -1,7 +1,3 @@
-//
-// Created by esgyn on 1/15/2021.
-//
-
 #ifndef MONITOR_TASK_H
 #define MONITOR_TASK_H
 

@@ -1,7 +1,3 @@
-//
-// Created by esgyn on 1/15/2021.
-//
-
 #include <sys/socket.h>
 #include <linux/netlink.h>
 #include <linux/connector.h>

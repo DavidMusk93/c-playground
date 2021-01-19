@@ -1,7 +1,3 @@
-//
-// Created by esgyn on 1/14/2021.
-//
-
 #ifndef MONITOR_BASE_H
 #define MONITOR_BASE_H
 

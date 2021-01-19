@@ -1,7 +1,3 @@
-//
-// Created by esgyn on 1/18/2021.
-//
-
 #include "sock.h"
 #include "test.h"
 

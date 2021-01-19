@@ -1,7 +1,3 @@
-//
-// Created by esgyn on 1/19/2021.
-//
-
 #ifndef MONITOR_LOOP_H
 #define MONITOR_LOOP_H
 

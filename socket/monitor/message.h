@@ -1,7 +1,3 @@
-//
-// Created by esgyn on 1/15/2021.
-//
-
 #ifndef MONITOR_MESSAGE_H
 #define MONITOR_MESSAGE_H
 
@@ -20,8 +16,10 @@ namespace sun {
         long timestamp;
     };
     struct Busy {
+        long reserved;
     };
     struct Idle {
+        long reserved;
     };
 
     struct Message {

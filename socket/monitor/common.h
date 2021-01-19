@@ -1,7 +1,3 @@
-//
-// Created by esgyn on 1/18/2021.
-//
-
 #ifndef MONITOR_COMMON_H
 #define MONITOR_COMMON_H
 

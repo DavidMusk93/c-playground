@@ -1,7 +1,3 @@
-//
-// Created by esgyn on 1/14/2021.
-//
-
 #ifndef MONITOR_FILE_WATCHER_H
 #define MONITOR_FILE_WATCHER_H
 
