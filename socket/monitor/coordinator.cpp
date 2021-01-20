@@ -1,11 +1,18 @@
 #include <mutex>
 #include <fstream>
+#include <unordered_map>
 
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <signal.h>
 
 #include "coordinator.h"
+#include "time_wheel.h"
+#include "timer.h"
+#include "message.h"
+#include "util.h"
+
+using namespace std::placeholders;
 
 std::mutex mtx;
 #define LOCKGUARD(x) std::lock_guard<std::mutex> __lk(x)
@@ -55,14 +62,6 @@ static void OnIpcFileCreate(struct inotify_event *ev, sun::Coordinator *handler)
 //
 //}
 
-static inline bool IsValidProcess(int pid) {
-    return kill(pid, 0) == 0;
-}
-
-static inline bool IsOpenFd(int fd) {
-    return fcntl(fd, F_GETFD) != -1;
-}
-
 static void Accept(int fd, sun::Coordinator *handler) {
     struct sockaddr_in peer{};
     socklen_t len = sizeof(peer);
@@ -75,7 +74,7 @@ static void Accept(int fd, sun::Coordinator *handler) {
     sun::Coordinator::Iterator it;
     do {
         for (it = idle_workers.begin(); it != idle_workers.end();) {
-            if (IsValidProcess(it->pid) && IsOpenFd(it->handler)) {
+            if (sun::utility::ValidProcess(it->pid) && sun::utility::ValidFd(it->handler)) {
                 break;
             } else {
                 LOGINFO("invalid worker %d#%d", it->pid, it->handler);
@@ -98,26 +97,91 @@ static void Accept(int fd, sun::Coordinator *handler) {
     close(sock);
 }
 
+struct WorkerHeartBeatInfo {
+    int pid{};
+    int handler{-1};
+    double timestamp{};
+
+    static std::shared_ptr<WorkerHeartBeatInfo> Create(int handler);
+};
+
+std::shared_ptr<WorkerHeartBeatInfo> WorkerHeartBeatInfo::Create(int handler) {
+    auto rval = std::make_shared<WorkerHeartBeatInfo>();
+    rval->handler = handler;
+    return rval;
+}
+
+static sun::TimeWheel<WorkerHeartBeatInfo, 10> timeWheel;
+static std::unordered_map<int, std::shared_ptr<WorkerHeartBeatInfo>> heartBeatInfo;
+
+static void OnWheelTick(int fd, sun::Coordinator *handler) {
+    sun::Timer::OnTimeout(fd);
+    auto slot = timeWheel.tick();
+    for (auto &i:slot) {
+        if (i.use_count() == 2) {
+            FUNCLOG("%d#%d timeout, kick it out", i->pid, i->handler);
+            handler->pollInstance().remove(i->handler);
+            heartBeatInfo.erase(i->handler);
+        }
+    }
+}
+
+static void OnRecvHeartBeat(int fd, sun::Coordinator *handler) {
+    sun::Message msg{};
+    recv(fd, &msg, sizeof(msg), MSG_WAITALL);
+    if (msg.type == sun::MessageType::PING) {
+        FUNCLOG("PING %d,%f", msg.pid, msg.ping.timestamp);
+        auto &info = heartBeatInfo[fd];
+        info->pid = msg.pid;
+        info->timestamp = sun::utility::Milliseconds();
+        timeWheel.current().push_back(info);
+        msg.type = sun::MessageType::PONG;
+        msg.pid = sun::utility::getpid();
+        msg.pong.timestamp = info->timestamp;
+        write(fd, &msg, sizeof(msg));
+    } else {
+        FUNCLOG("unknown Message type");
+    }
+}
+
+static void AcceptWorkerConnection(int fd, sun::Coordinator *handler) {
+    int sock;
+    ERRRET((sock = accept(fd, nullptr, nullptr)) == -1, , , 1, "accept");
+    LOGINFO("new Worker Heart Beat connection %d", sock);
+    auto info = WorkerHeartBeatInfo::Create(sock);
+    heartBeatInfo[sock] = info;
+    timeWheel.current().push_back(info);
+    handler->pollInstance().registerEntry(sock, EPOLLRDHUP | EPOLLIN, std::bind(&OnRecvHeartBeat, _1, handler));
+}
+
 namespace sun {
-    Coordinator::Coordinator() {
-        using namespace std::placeholders;
+    Coordinator::Coordinator() : ipc_{} {
         OnStart();
         io::TcpipServer tcpipServer(config_.port);
         pollInstance().registerEntry(tcpipServer.transferOwnership(), EPOLLIN,
-                                     std::bind(&Accept, _1, this),
-                                     {});
+                                     std::bind(&Accept, _1, this));
         fw_.registerCallback(io::FileWatcher::EventType::CREATE, std::bind(&OnIpcFileCreate, _1, this))
                 .watchPath(WORKDIR);
-        cleanup_ = Defer([] { remove(COORDINATOR_PIDFILE); });
+        sun::Timer::Config config(1);
+        sun::Timer timer(config);
+        pollInstance().registerEntry(timer.transferOwnership(), EPOLLIN, std::bind(&OnWheelTick, _1, this));
+        sprintf(ipc_, COORDINATOR_IPC_PATTERN, utility::getpid());
+        io::UnixServer unixServer(ipc_);
+        pollInstance().registerEntry(unixServer.transferOwnership(), EPOLLIN,
+                                     std::bind(&AcceptWorkerConnection, _1, this));
+        cleanup_ = Defer([this] {
+            remove(COORDINATOR_PIDFILE);
+            remove(ipc_);
+        });
     }
 
     Coordinator::~Coordinator() {
         fw_.stop();
         for (auto &worker:busy_workers_) {
-            close(worker.handler);
+            utility::Close(worker.handler);
         }
         for (auto &worker:idle_workers_) {
-            close(worker.handler);
+            utility::Close(worker.handler);
         }
     }
 

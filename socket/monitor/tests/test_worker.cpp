@@ -27,5 +27,8 @@ MAIN() {
     INSTALLSIGINTHANDLER(&SigHandler);
     sun::Worker worker;
     g_handler = &worker;
-    worker.loop();
+    worker.coordinatorPid() = pid;
+    if (worker.startHeartBeat()) {
+        worker.loop();
+    }
 }

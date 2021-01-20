@@ -11,6 +11,7 @@
 
 #include "base.h"
 #include "runner.h"
+#include "endpoint.h"
 
 #define SOCKADDRPTR(ptr) (struct sockaddr*)(ptr)
 #define SOCKADDR_EX(x) SOCKADDRPTR(&x),sizeof(x)
@@ -22,24 +23,6 @@ ERRRET(setsockopt(sock,level,name,&val,sizeof(val))!=0,code,,1,"setsockopt");
 
 namespace sun {
     namespace io {
-        class EndPoint : public nocopy {
-        public:
-            virtual ~EndPoint() = default;
-
-            explicit operator int() const {
-                return fd_;
-            };
-
-            virtual int transferOwnership() {
-                cleanup_.cancel();
-                return fd_;
-            };
-
-        protected:
-            int fd_{-1};
-            Defer cleanup_;
-        };
-
         class UnixServer : public EndPoint {
         public:
             explicit UnixServer(const std::string &path);
@@ -131,12 +114,16 @@ namespace sun {
                 return epoll_handler_;
             }
 
-            void registerEntry(int fd, unsigned events, Entry::Callback on_read, Entry::Callback on_close);
+            void registerEntry(int fd, unsigned events, Entry::Callback on_read, Entry::Callback on_close = {});
 
             void loop();
 
             void quit() {
                 terminator_.trigger();
+            }
+
+            void remove(int fd) {
+                entry_map_.erase(fd);
             }
 
         private:
@@ -153,10 +140,6 @@ namespace sun {
         bool SendFd(int sock, int fd);
 
         int RecvFd(int sock);
-    }
-
-    namespace utility {
-        void close(int &fd);
     }
 }
 

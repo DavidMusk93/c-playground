@@ -41,6 +41,7 @@ namespace sun {
         }
 
     private:
+        char ipc_[64];
         io::FileWatcher fw_;
         Defer cleanup_;
         std::list<WorkerMeta> busy_workers_;

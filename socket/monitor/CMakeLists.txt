@@ -11,8 +11,11 @@ aux_source_directory(. SRCS)
 add_library(${PROJECT_NAME} ${SRCS})
 target_link_libraries(${PROJECT_NAME} pthread)
 
-add_executable(coordinator tests/test_coordinator.cpp)
-target_link_libraries(coordinator pthread ${PROJECT_NAME})
+macro(TEST_BUILD target)
+    add_executable(${target} ${ARGN})
+    target_link_libraries(${target} pthread ${PROJECT_NAME})
+endmacro()
 
-add_executable(worker tests/test_worker.cpp)
-target_link_libraries(worker pthread ${PROJECT_NAME})
+TEST_BUILD(coordinator tests/test_coordinator.cpp)
+TEST_BUILD(worker tests/test_worker.cpp)
+

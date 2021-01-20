@@ -23,9 +23,21 @@ namespace sun {
             return state_;
         }
 
+        int &coordinatorPid() {
+            return pid_;
+        }
+
+        bool startHeartBeat();
+
+        bool checkCred(int fd) const;
+
     private:
         Defer cleanup_;
         State state_;
+        int pid_;
+        struct {
+            bool check_cred{true};
+        } config_;
     };
 }
 

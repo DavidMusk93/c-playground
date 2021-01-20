@@ -7,13 +7,14 @@ namespace sun {
         PONG,
         BUSY,
         IDLE,
+        UNKNOWN,
     };
 
     struct Ping {
-        long timestamp;
+        double timestamp;
     };
     struct Pong {
-        long timestamp;
+        double timestamp;
     };
     struct Busy {
         long reserved;
@@ -24,6 +25,7 @@ namespace sun {
 
     struct Message {
         MessageType type;
+        int pid;
         union {
             Ping ping;
             Pong pong;
