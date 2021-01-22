@@ -17,7 +17,7 @@ namespace sun {
             return p;
         }
     }
-    namespace utility {
+    namespace util {
         double Milliseconds() {
             struct timespec ts{};
             clock_gettime(CLOCK_REALTIME, &ts);
@@ -48,6 +48,15 @@ namespace sun {
             }
             struct pollfd pfd{.fd=pipe->readEnd(), .events=POLLIN};
             return poll(&pfd, 1, ms);
+        }
+
+        TimeThis::TimeThis(std::string tag) : ms_(0), tag_(std::move(tag)) {
+            FUNCLOG("START,%s", tag_.c_str());
+            OnStart();
+        }
+
+        TimeThis::~TimeThis() {
+            FUNCLOG("STOP,%s,%g", tag_.c_str(), OnStop());
         }
     }
 }

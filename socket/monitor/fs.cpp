@@ -4,7 +4,7 @@
 #include <fcntl.h>
 
 namespace sun {
-    namespace utility {
+    namespace util {
         void Close(int &fd) {
             if (fd != -1 && ValidFd(fd)) {
                 ::close(fd);

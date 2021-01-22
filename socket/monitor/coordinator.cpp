@@ -22,7 +22,7 @@ std::mutex mtx;
 static void OnStart() {
     mkdir(WORKDIR, 0660);
     std::ofstream ofs(COORDINATOR_PIDFILE, std::ios::trunc);
-    ofs << sun::utility::GetPid();
+    ofs << sun::util::GetPid();
 }
 
 static void OnIpcFileCreate(struct inotify_event *ev, sun::Coordinator *handler) {
@@ -74,7 +74,7 @@ static void Accept(int fd, sun::Coordinator *handler) {
     sun::Coordinator::Iterator it;
     do {
         for (it = idle_workers.begin(); it != idle_workers.end();) {
-            if (sun::utility::ValidProcess(it->pid) && sun::utility::ValidFd(it->handler)) {
+            if (sun::util::ValidProcess(it->pid) && sun::util::ValidFd(it->handler)) {
                 break;
             } else {
                 LOGINFO("invalid worker %d#%d", it->pid, it->handler);
@@ -133,10 +133,10 @@ static void OnRecvHeartBeat(int fd, sun::Coordinator *handler) {
         FUNCLOG("PING %d,%f", msg.pid, msg.ping.timestamp);
         auto &info = heartBeatInfo[fd];
         info->pid = msg.pid;
-        info->timestamp = sun::utility::Milliseconds();
+        info->timestamp = sun::util::Milliseconds();
         timeWheel.current().push_back(info);
         msg.type = sun::MessageType::PONG;
-        msg.pid = sun::utility::GetPid();
+        msg.pid = sun::util::GetPid();
         msg.pong.timestamp = info->timestamp;
         write(fd, &msg, sizeof(msg));
     } else {
@@ -165,7 +165,7 @@ namespace sun {
         sun::Timer::Config config(1);
         sun::Timer timer(config);
         pollInstance().registerEntry(timer.transferOwnership(), EPOLLIN, std::bind(&OnWheelTick, _1, this));
-        sprintf(ipc_, COORDINATOR_IPC_PATTERN, utility::GetPid());
+        sprintf(ipc_, COORDINATOR_IPC_PATTERN, util::GetPid());
         io::UnixServer unixServer(ipc_);
         pollInstance().registerEntry(unixServer.transferOwnership(), EPOLLIN,
                                      std::bind(&AcceptWorkerConnection, _1, this));
@@ -178,10 +178,10 @@ namespace sun {
     Coordinator::~Coordinator() {
         fw_.stop();
         for (auto &worker:busy_workers_) {
-            utility::Close(worker.handler);
+            util::Close(worker.handler);
         }
         for (auto &worker:idle_workers_) {
-            utility::Close(worker.handler);
+            util::Close(worker.handler);
         }
     }
 

@@ -7,7 +7,7 @@ namespace sun {
     constexpr double kThousand = 1000;
     constexpr double kMillion = 1000000;
 
-    namespace utility {
+    namespace util {
         using TimeFormatter = std::function<const char *(char buf[32], int seconds, int milliseconds)>;
 
         double Milliseconds();
@@ -19,6 +19,26 @@ namespace sun {
         int GetPid();
 
         int Sleep(int ms);
+
+        class TimeThis {
+        public:
+            explicit TimeThis(std::string tag);
+
+            ~TimeThis();
+
+        protected:
+            void OnStart() {
+                ms_ = Milliseconds();
+            }
+
+            double OnStop() const {
+                return Milliseconds() - ms_;
+            }
+
+        private:
+            std::string tag_;
+            double ms_;
+        };
     }
 }
 

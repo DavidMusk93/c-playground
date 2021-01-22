@@ -2,7 +2,7 @@
 #define MONITOR_FS_H
 
 namespace sun {
-    namespace utility {
+    namespace util {
         void Close(int &fd);
 
         bool ValidFd(int fd);

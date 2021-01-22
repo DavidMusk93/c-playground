@@ -10,7 +10,7 @@
 namespace sun {
     namespace io {
         UnixServer::UnixServer(const std::string &path) {
-            cleanup_ = Defer([this] { utility::Close(fd_); });
+            cleanup_ = Defer([this] { util::Close(fd_); });
             ERRRET(remove(path.c_str()) == -1 && errno != ENOENT, , , 1, "Fail to remove %s", path.c_str());
             struct sockaddr_un sa{};
             sa.sun_family = AF_UNIX;
@@ -32,7 +32,7 @@ namespace sun {
 
         TcpipServer &TcpipServer::initialize() {
             if (state_ == EndPoint::State::NOTHINGNESS) {
-                cleanup_ = Defer([this] { utility::Close(fd_); });
+                cleanup_ = Defer([this] { util::Close(fd_); });
                 fd_ = socket(AF_INET, SOCK_STREAM, 0);
                 if (config_.reuseaddr) {
                     SETSOCKOPT(fd_, SOL_SOCKET, SO_REUSEADDR, config_.reuseaddr, *this);
@@ -54,7 +54,7 @@ namespace sun {
         }
 
         UnixClient::UnixClient(const std::string &path) {
-            cleanup_ = Defer([this] { utility::Close(fd_); });
+            cleanup_ = Defer([this] { util::Close(fd_); });
             fd_ = socket(AF_UNIX, config_.type, 0);
             struct sockaddr_un sa{};
             sa.sun_family = AF_UNIX;
@@ -106,7 +106,7 @@ namespace sun {
 
         Poll::Poll() {
             ERRRET((epoll_handler_ = epoll_create1(0)) == -1, , , 1, "epoll_create1");
-            cleanup_ = Defer([this] { utility::Close(epoll_handler_); });
+            cleanup_ = Defer([this] { util::Close(epoll_handler_); });
         }
 
         void Poll::registerEntry(int fd, unsigned int events, Entry::Callback on_read, Entry::Callback on_close) {

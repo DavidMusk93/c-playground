@@ -9,7 +9,7 @@ namespace sun {
         int nr = read(fd, buf, sizeof(buf));
         if (nr > 0) {
             buf[nr] = 0;
-            FUNCLOG("new Message %d,'%s'", nr, buf);
+            FUNCLOG("#%d new Message %d,'%s'", fd, nr, buf);
             write(fd, buf, nr);
         }
     }

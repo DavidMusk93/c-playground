@@ -30,7 +30,7 @@ if(__y){\
         ERRRET((fd_ = timerfd_create(CLOCK_REALTIME, flags)) == -1, , , 1, "timerfd_create");
         auto its = (struct itimerspec) config;
         timerfd_settime(fd_, 0, &its, nullptr);
-        cleanup_ = Defer([this] { utility::Close(fd_); });
+        cleanup_ = Defer([this] { util::Close(fd_); });
     }
 
     void Timer::OnTimeout(int fd) {

@@ -14,7 +14,7 @@
 #define WHEREFALSE while(false)
 #define INITMEMBER(x) x##_(x)
 
-#define __LOG(os, fmt, ...) fprintf(os,"%s " fmt "\n",sun::utility::Now(nullptr),##__VA_ARGS__)
+#define __LOG(os, fmt, ...) fprintf(os,"%s " fmt "\n",sun::util::Now(nullptr),##__VA_ARGS__)
 #define LOGINFO(fmt, ...) __LOG(stdout,fmt,##__VA_ARGS__)
 #define LOGERROR(fmt, ...) __LOG(stderr,fmt,##__VA_ARGS__)
 #define FUNCLOG(fmt, ...) LOGINFO("@%s " fmt,__func__,##__VA_ARGS__)
