@@ -23,19 +23,34 @@ namespace sun {
             LOGINFO("new UnixServer %s", path.c_str());
         }
 
-        TcpipServer::TcpipServer(short port) {
-            cleanup_ = Defer([this] { utility::Close(fd_); });
-            fd_ = socket(AF_INET, SOCK_STREAM, 0);
-            if (config_.reuseaddr) {
-                SETSOCKOPT(fd_, SOL_SOCKET, SO_REUSEADDR, config_.reuseaddr,);
+        TcpipServer::TcpipServer(short port, bool lazy) {
+            config_.port = port;
+            if (!lazy) {
+                initialize();
             }
-            if (config_.reuseport) {
-                SETSOCKOPT(fd_, SOL_SOCKET, SO_REUSEPORT, config_.reuseport,);
+        }
+
+        TcpipServer &TcpipServer::initialize() {
+            if (state_ == EndPoint::State::NOTHINGNESS) {
+                cleanup_ = Defer([this] { utility::Close(fd_); });
+                fd_ = socket(AF_INET, SOCK_STREAM, 0);
+                if (config_.reuseaddr) {
+                    SETSOCKOPT(fd_, SOL_SOCKET, SO_REUSEADDR, config_.reuseaddr, *this);
+                }
+                if (config_.reuseport) {
+                    SETSOCKOPT(fd_, SOL_SOCKET, SO_REUSEPORT, config_.reuseport, *this);
+                }
+                struct sockaddr_in sa{.sin_family=AF_INET, .sin_port=htons(config_.port), .sin_addr={INADDR_ANY}};
+                ERRRET(bind(fd_, SOCKADDR_EX(sa)) == -1, *this, , 1, "bind");
+                ERRRET(listen(fd_, config_.backlog) == -1, *this, , 1, "listen");
+                LOGINFO("new TcpipServer " SOCKADDR_FMT, SOCKADDR_OF(sa));
+                state_ = State::INITIALIZED;
             }
-            struct sockaddr_in sa{.sin_family=AF_INET, .sin_port=htons(port), .sin_addr={INADDR_ANY}};
-            ERRRET(bind(fd_, SOCKADDR_EX(sa)) == -1, , , 1, "bind");
-            ERRRET(listen(fd_, config_.backlog) == -1, , , 1, "listen");
-            LOGINFO("new TcpipServer " SOCKADDR_FMT, SOCKADDR_OF(sa));
+            return *this;
+        }
+
+        void TcpipServer::enableSharePort() {
+            config_.reuseport = 1;
         }
 
         UnixClient::UnixClient(const std::string &path) {

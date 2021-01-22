@@ -55,7 +55,7 @@ static void SendPing(int fd) {
     FUNCLOG("");
     sun::Message msg{};
     msg.type = sun::MessageType::PING;
-    msg.pid = sun::utility::getpid();
+    msg.pid = sun::utility::GetPid();
     msg.ping.timestamp = sun::utility::Milliseconds();
     write(fd, &msg, sizeof(msg));
 }
@@ -68,7 +68,7 @@ static void RecvPong(int fd) {
 
 namespace sun {
     Worker::Worker() : state_(State::STARTUP), pid_(-1) {
-        sprintf(ipc, WORKER_IPC_PATTERN, utility::getpid());
+        sprintf(ipc, WORKER_IPC_PATTERN, utility::GetPid());
         sprintf(ipc_notifier, WORKDIR "/%s", ipc);
         io::UnixServer unixServer(ipc);
         pollInstance().registerEntry(unixServer.transferOwnership(), EPOLLIN, std::bind(&Accept, _1, this), {});

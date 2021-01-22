@@ -51,15 +51,21 @@ namespace sun {
 
         class TcpipServer : public EndPoint {
         public:
-            explicit TcpipServer(short port);
+            explicit TcpipServer(short port, bool lazy = false);
 
             ~TcpipServer() override = default;
+
+            // Invoke virtual function from ctor/dtor is danger
+            TcpipServer &initialize();
+
+            void enableSharePort();
 
         private:
             struct {
                 int backlog{5};
                 int reuseaddr{1};
                 int reuseport{0};
+                short port{0};
             } config_;
         };
 

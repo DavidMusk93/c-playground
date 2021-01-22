@@ -22,7 +22,7 @@ std::mutex mtx;
 static void OnStart() {
     mkdir(WORKDIR, 0660);
     std::ofstream ofs(COORDINATOR_PIDFILE, std::ios::trunc);
-    ofs << sun::utility::getpid();
+    ofs << sun::utility::GetPid();
 }
 
 static void OnIpcFileCreate(struct inotify_event *ev, sun::Coordinator *handler) {
@@ -136,7 +136,7 @@ static void OnRecvHeartBeat(int fd, sun::Coordinator *handler) {
         info->timestamp = sun::utility::Milliseconds();
         timeWheel.current().push_back(info);
         msg.type = sun::MessageType::PONG;
-        msg.pid = sun::utility::getpid();
+        msg.pid = sun::utility::GetPid();
         msg.pong.timestamp = info->timestamp;
         write(fd, &msg, sizeof(msg));
     } else {
@@ -165,7 +165,7 @@ namespace sun {
         sun::Timer::Config config(1);
         sun::Timer timer(config);
         pollInstance().registerEntry(timer.transferOwnership(), EPOLLIN, std::bind(&OnWheelTick, _1, this));
-        sprintf(ipc_, COORDINATOR_IPC_PATTERN, utility::getpid());
+        sprintf(ipc_, COORDINATOR_IPC_PATTERN, utility::GetPid());
         io::UnixServer unixServer(ipc_);
         pollInstance().registerEntry(unixServer.transferOwnership(), EPOLLIN,
                                      std::bind(&AcceptWorkerConnection, _1, this));

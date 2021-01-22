@@ -15,6 +15,10 @@ namespace sun {
         bool ValidProcess(int pid);
 
         const char *Now(char buf[32], TimeFormatter formatter = {});
+
+        int GetPid();
+
+        int Sleep(int ms);
     }
 }
 

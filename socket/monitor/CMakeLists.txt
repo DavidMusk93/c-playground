@@ -18,4 +18,4 @@ endmacro()
 
 TEST_BUILD(coordinator tests/test_coordinator.cpp)
 TEST_BUILD(worker tests/test_worker.cpp)
-
+TEST_BUILD(reuseport tests/test_reuseport.cpp)

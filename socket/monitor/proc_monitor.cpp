@@ -17,7 +17,7 @@ namespace sun {
             on_failure = Defer([&sock] { close(sock); });
             sa.nl_family = AF_NETLINK;
             sa.nl_groups = CN_IDX_PROC;
-            sa.nl_pid = sun::utility::getpid();
+            sa.nl_pid = sun::utility::GetPid();
             ERRRET(bind(sock, (struct sockaddr *) &sa, sizeof(sa)) == -1, false, , 1, "bind");
             on_failure.cancel();
             return true;
@@ -33,7 +33,7 @@ namespace sun {
             } msg{};
             auto &hdr = msg.hdr;
             hdr.nlmsg_len = sizeof(msg);
-            hdr.nlmsg_pid = sun::utility::getpid();
+            hdr.nlmsg_pid = sun::utility::GetPid();
             hdr.nlmsg_type = NLMSG_DONE;
             msg.body.id.idx = CN_IDX_PROC;
             msg.body.id.val = CN_VAL_PROC;

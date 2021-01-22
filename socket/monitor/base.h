@@ -101,10 +101,6 @@ namespace sun {
 
         ~nocopy() = default;
     };
-
-    namespace utility {
-        int getpid();
-    }
 }
 
 #endif //MONITOR_BASE_H
