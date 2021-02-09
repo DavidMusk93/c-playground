@@ -75,28 +75,38 @@ namespace sun {
             public:
                 using Callback = std::function<void(int)>;
 
-                Entry() : fd_(-1) {}
+                Entry() : closeable_(true), fd_(-1) {}
 
                 Entry(int epoll_handler, int fd, unsigned events);
 
-                Entry(Entry &&entry) noexcept: fd_(-1) {
+                Entry(Entry &&entry) noexcept: Entry() {
                     *this = entry.move();
                 }
 
                 Entry &operator=(Entry &&entry) noexcept {
                     on_read.swap(entry.on_read);
                     on_close.swap(entry.on_close);
+                    std::swap(closeable_, entry.closeable_);
                     std::swap(fd_, entry.fd_);
                     cleanup_.swap(entry.cleanup_);
                     return *this;
                 }
 
-                ~Entry() = default;
+                explicit operator int() const {
+                    return fd_;
+                }
+
+                ~Entry();
 
                 bool trigger(int fd, unsigned events) const;
 
                 Entry &&move() {
                     return static_cast<Entry &&>(*this);
+                }
+
+                int transferOwnership() {
+                    closeable_ = false;
+                    return fd_;
                 }
 
             protected:
@@ -108,6 +118,7 @@ namespace sun {
                 Callback on_read;
                 Callback on_close;
             private:
+                bool closeable_;
                 int fd_;
                 Defer cleanup_;
             };
@@ -128,7 +139,10 @@ namespace sun {
                 terminator_.trigger();
             }
 
-            void remove(int fd) {
+            void remove(int fd, Entry *entryptr = nullptr) {
+                if (entryptr) {
+                    *entryptr = entry_map_[fd].move();
+                }
                 entry_map_.erase(fd);
             }
 

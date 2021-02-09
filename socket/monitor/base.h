@@ -82,6 +82,10 @@ namespace sun {
             }
         }
 
+        void operator()() {
+            trigger();
+        }
+
         void swap(Defer &defer) {
             closure_.swap(defer.closure_);
         }

@@ -14,7 +14,7 @@
 #include "macro.h"
 #include "utility.h"
 
-#ifdef TEST_SIGIO_REFINE
+//#ifdef TEST_SIGIO_REFINE
 
 MAIN() {
     int flags;
@@ -45,4 +45,4 @@ MAIN() {
     return 0;
 }
 
-#endif
+//#endif

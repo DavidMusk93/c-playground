@@ -66,12 +66,18 @@ namespace sun {
             ERRRET(connect(fd_, SOCKADDR_EX(sa)) == -1, , , 1, "connect");
         }
 
-        Poll::Entry::Entry(int epoll_handler, int fd, unsigned events) : fd_(fd) {
+        Poll::Entry::Entry(int epoll_handler, int fd, unsigned events) : closeable_(true), fd_(fd) {
             if (Register(epoll_handler, fd, events) == 0) {
                 cleanup_ = Defer([epoll_handler, fd] {
                     Unregister(epoll_handler, fd);
-                    close(fd);
                 });
+            }
+        }
+
+        Poll::Entry::~Entry() {
+            cleanup_(); // unregister before close fd
+            if (closeable_) {
+                util::Close(fd_);
             }
         }
 
