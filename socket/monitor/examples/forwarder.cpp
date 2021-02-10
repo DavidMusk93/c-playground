@@ -16,10 +16,14 @@
 
 using namespace std::placeholders;
 
-static void accept_client(int fd, FORWARDER *handler);
-static void accept_follower(int fd, FORWARDER *handler);
-static void notify_connecting(int fd, FORWARDER *handler);
-static void peek_header(int fd, FORWARDER *handler);
+#define DECLARECALLBACK(name, fd, context) static void name(int fd,FORWARDER*context)
+#define IMPLCALLBACK(name) DECLARECALLBACK(name,fd,handler)
+#define BINDCALLBACK(name, context) std::bind(&name,_1,context)
+
+DECLARECALLBACK(accept_client, ,);
+DECLARECALLBACK(accept_follower, ,);
+DECLARECALLBACK(notify_connecting, ,);
+DECLARECALLBACK(peek_header, ,);
 
 void FollowerContext::publish(CLIENTINFO &ci) {
     // @TODO make robust
@@ -33,19 +37,19 @@ void FollowerContext::publish(CLIENTINFO &ci) {
 namespace sun {
     Forwarder::Forwarder() {
         io::UnixServer unixServer(FORWARDER_IPCFILE);
-        pollInstance().registerEntry(unixServer.transferOwnership(), EPOLLIN, std::bind(&accept_follower, _1, this));
+        pollInstance().registerEntry(unixServer.transferOwnership(), EPOLLIN, BINDCALLBACK(accept_follower, this));
         SignalFd signalFd(FORWARDER_NOTIFYSIGNAL);
-        pollInstance().registerEntry(signalFd.transferOwnership(), EPOLLIN, std::bind(&notify_connecting, _1, this));
+        pollInstance().registerEntry(signalFd.transferOwnership(), EPOLLIN, BINDCALLBACK(notify_connecting, this));
         io::TcpipServer tcpipServer(FORWARDER_SERVICEPORT);
-        pollInstance().registerEntry(tcpipServer.transferOwnership(), EPOLLIN, std::bind(&accept_client, _1, this));
+        pollInstance().registerEntry(tcpipServer.transferOwnership(), EPOLLIN, BINDCALLBACK(accept_client, this));
     }
 }
 
-static void accept_client(int fd, FORWARDER *handler) {
-    sun::OnTcpipAccept(fd, &handler->pollInstance(), std::bind(&peek_header, _1, handler));
+IMPLCALLBACK(accept_client) {
+    sun::OnTcpipAccept(fd, &handler->pollInstance(), BINDCALLBACK(peek_header, handler));
 }
 
-static void accept_follower(int fd, FORWARDER *handler) {
+IMPLCALLBACK(accept_follower) {
     static int pid = sun::util::GetPid();
     int sock = accept(fd, nullptr, nullptr);
     ERRRET(sock == -1, , , 1, "accept");
@@ -70,7 +74,7 @@ static void accept_follower(int fd, FORWARDER *handler) {
     });
 }
 
-static void notify_connecting(int fd, FORWARDER *handler) {
+IMPLCALLBACK(notify_connecting) {
     struct signalfd_siginfo si{};
     read(fd, &si, sizeof(struct signalfd_siginfo));
     FUNCLOG("dialogue,%d,%d,%d", si.ssi_int, si.ssi_signo, si.ssi_pid);
@@ -88,7 +92,7 @@ static void notify_connecting(int fd, FORWARDER *handler) {
     }
 }
 
-static void peek_header(int fd, FORWARDER *handler) {
+IMPLCALLBACK(peek_header) {
     FUNCLOG("#%d is ready", fd);
     sun::io::Poll::Entry entry;
     LISTCLIENT.push_front({});
@@ -112,9 +116,10 @@ static void peek_header(int fd, FORWARDER *handler) {
 
 DECLAREPOLLSIGNALHANDLER(g_handler, sig_handler);
 
-int main() {
+MAIN() {
     sun::Forwarder forwarder;
     g_handler = &forwarder.pollInstance();
     INSTALLSIGINTHANDLER(&sig_handler);
     forwarder.loop(); // LOOP occupies the main thread (process)
+    return 0;
 }
