@@ -20,6 +20,10 @@ namespace sun {
 
         int Sleep(int ms);
 
+        int NiceName(std::string &&name);
+
+        const char *WhichExe();
+
         class TimeThis {
         public:
             explicit TimeThis(std::string tag);
