@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <linux/version.h>
+
+#define ENABLEOFD LINUX_VERSION_CODE>=KERNEL_VERSION(3,15,0)
 
 #include "macro.h"
 
@@ -20,7 +23,9 @@ public:
      */
     enum class Type : char {
         RECORD = 0,
+#if ENABLEOFD
         OFD = 1,
+#endif
         UNKNOWN,
     };
 
@@ -79,11 +84,15 @@ protected:
     int Lock(bool isblock = false, bool istest = false) {
         static int kMatrix[2/*record(0),ofd(1)*/][3/*nonblock(0),block(1),test(2)*/] = {
                 {F_SETLK,     F_SETLKW,     F_GETLK},
+#if ENABLEOFD
                 {F_OFD_SETLK, F_OFD_SETLKW, F_OFD_GETLK}
+#endif
         };
         switch (type_) {
             case Type::RECORD:
+#if ENABLEOFD
             case Type::OFD:
+#endif
                 return fcntl(fd_, kMatrix[static_cast<int>(type_)][istest ? 2 : isblock], &fl_);
             default:
                 return 0;
