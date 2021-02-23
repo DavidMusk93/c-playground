@@ -43,6 +43,26 @@ namespace sun {
             std::string tag_;
             double ms_;
         };
+
+        class Daemon {
+        public:
+            struct Context;
+            using Task = std::function<void(Context *)>;
+            struct Context {
+                int fd;
+                std::string exe;
+                std::string name;
+                Task main;
+                Task onfork;
+            };
+
+            Daemon(std::string name, Task main, Task onfork = {});
+
+            int run();
+
+        private:
+            Context ctx_;
+        };
     }
 }
 

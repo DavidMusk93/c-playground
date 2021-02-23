@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <sys/signalfd.h>
+#include <poll.h>
 
 #include "sock.h"
 #include "callback.h"
@@ -21,8 +22,11 @@ using namespace std::placeholders;
 #define BINDCALLBACK(name, context) std::bind(&name,_1,context)
 
 DECLARECALLBACK(accept_client, ,);
+
 DECLARECALLBACK(accept_follower, ,);
+
 DECLARECALLBACK(notify_connecting, ,);
+
 DECLARECALLBACK(peek_header, ,);
 
 void FollowerContext::publish(CLIENTINFO &ci) {
@@ -35,13 +39,17 @@ void FollowerContext::publish(CLIENTINFO &ci) {
 }
 
 namespace sun {
-    Forwarder::Forwarder() {
+    Forwarder::Forwarder() : error_count(0) {
         io::UnixServer unixServer(FORWARDER_IPCFILE);
         pollInstance().registerEntry(unixServer.transferOwnership(), EPOLLIN, BINDCALLBACK(accept_follower, this));
         SignalFd signalFd(FORWARDER_NOTIFYSIGNAL);
         pollInstance().registerEntry(signalFd.transferOwnership(), EPOLLIN, BINDCALLBACK(notify_connecting, this));
         io::TcpipServer tcpipServer(FORWARDER_SERVICEPORT);
-        pollInstance().registerEntry(tcpipServer.transferOwnership(), EPOLLIN, BINDCALLBACK(accept_client, this));
+        if (tcpipServer.valid()) {
+            pollInstance().registerEntry(tcpipServer.transferOwnership(), EPOLLIN, BINDCALLBACK(accept_client, this));
+        } else {
+            ++error_count;
+        }
     }
 }
 
@@ -113,13 +121,53 @@ IMPLCALLBACK(peek_header) {
 }
 
 #include "test.h"
+#include "status.h"
 
 DECLAREPOLLSIGNALHANDLER(g_handler, sig_handler);
 
+#define PROGRAMNAME "forwarder"
+#define TMPDIR "/tmp"
+#define LOCKFILE TMPDIR "/" PROGRAMNAME ".lock"
+#define LOGFILE TMPDIR "/" PROGRAMNAME ".log"
+
 MAIN() {
+    sun::FileLock fl(LOCKFILE, sun::RECORD);
+    if (fl.setType(F_WRLCK).lock() == -1) {
+        return kConflict;
+    }
+    using namespace sun::util;
+    RedirectOutput(LOGFILE);
+    Daemon::Task submain = [&fl](Daemon::Context *ctxp) {
+        fl.cleanup();
+        do {
+            int rval, status{0};
+            struct pollfd pfd{.fd=ctxp->fd, .events=POLLIN};
+            POLL(rval, poll, &pfd, 1, -1);
+            if (rval == 1 && read(pfd.fd, &status, sizeof(status)) == sizeof(status) && status == kConflict) {
+                LOGERROR("[%s]fatal error,quit", ctxp->name.c_str());
+                return;
+            }
+        } while (0);
+        int duration = 5;
+        LOGINFO("[%s] master dead,revoke it(after %ds)", ctxp->name.c_str(), duration);
+        sleep(duration); // duration to regret
+        execl(ctxp->exe.c_str(), ctxp->exe.c_str(), 0);
+    };
+    int notifier;
+    Daemon::Task onfork = [&notifier](Daemon::Context *ctxp) {
+        notifier = ctxp->fd;
+    };
+    Daemon daemon(PROGRAMNAME ".daemon", submain, onfork);
+    daemon.run();
     sun::Forwarder forwarder;
+    if (forwarder.error_count) {
+        int code = kConflict;
+        write(notifier, &code, sizeof(code));
+        return code;
+    }
     g_handler = &forwarder.pollInstance();
     INSTALLSIGINTHANDLER(&sig_handler);
     forwarder.loop(); // LOOP occupies the main thread (process)
+    close(notifier);
     return 0;
 }

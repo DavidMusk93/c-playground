@@ -18,6 +18,10 @@ namespace sun {
 
         void closeWriteEnd();
 
+        void giveupOwnership() {
+            fds_[0] = fds_[1] = -1;
+        }
+
     public:
         static constexpr int kRead = 0;
         static constexpr int kWrite = 1;

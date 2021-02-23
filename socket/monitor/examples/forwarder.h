@@ -54,6 +54,7 @@ namespace sun {
         LIST_CLIENTINFO list_client;
         LIST_FOLLOWERCONTEXT list_follower;
         std::unordered_map<int/*pid*/, ITERATOR_FOLLOEWRCONTEXT> map_follower; // auxiliary data to boost search
+        int error_count;
     };
 }
 

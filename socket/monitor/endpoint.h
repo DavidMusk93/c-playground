@@ -34,6 +34,10 @@ namespace sun {
             return state_;
         }
 
+        bool valid() const {
+            return fd_ != -1;
+        }
+
     protected:
         int fd_;
         State state_;

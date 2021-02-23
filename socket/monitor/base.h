@@ -8,6 +8,7 @@
 #include <string.h>
 #include <error.h>
 
+#include "nocopy.h"
 #include "fs.h"
 #include "util.h"
 
@@ -40,10 +41,10 @@ if(expr){\
 }
 
 namespace sun {
+    using Closure = std::function<void(void)>;
+
     class Defer {
     public:
-        using Closure = std::function<void(void)>;
-
         Defer() = default;
 
         explicit Defer(Closure closure) {
@@ -92,18 +93,6 @@ namespace sun {
 
     private:
         Closure closure_;
-    };
-
-    class nocopy {
-    public:
-        nocopy(const nocopy &) = delete;
-
-        nocopy &operator=(const nocopy &) = delete;
-
-    protected:
-        nocopy() = default;
-
-        ~nocopy() = default;
     };
 }
 

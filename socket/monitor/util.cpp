@@ -1,5 +1,6 @@
 #include "util.h"
 #include "pipe.h"
+#include "status.h"
 
 #include <time.h>
 #include <signal.h>
@@ -7,9 +8,9 @@
 #include <sys/poll.h>
 #include <sys/syscall.h>
 #include <sys/prctl.h>
+#include <sys/wait.h>
 
 #include <memory>
-#include <vector>
 
 namespace sun {
     namespace details {
@@ -150,6 +151,41 @@ for(i=0;i<_n;++i){\
 
         TimeThis::~TimeThis() {
             FUNCLOG("STOP,%s,%g", tag_.c_str(), OnStop());
+        }
+
+        Daemon::Daemon(std::string name, Task main, Task onfork) {
+            ctx_.exe = sun::util::WhichExe();
+            ctx_.name.swap(name);
+            ctx_.main.swap(main);
+            ctx_.onfork.swap(onfork);
+        }
+
+        int Daemon::run() {
+            sun::Pipe pipe;
+            int pid = fork();
+            if (pid == -1) {
+                return kCorruption;
+            }
+            if (pid) {
+                pipe.closeReadEnd();
+                ctx_.fd = pipe.writeEnd();
+                pipe.giveupOwnership();
+                if (ctx_.onfork) {
+                    ctx_.onfork(&ctx_);
+                }
+                waitpid(pid, 0, 0);
+                return 0;
+            } else if (fork()) {
+                exit(0);
+            } else {
+                setsid();
+                std::string name = ctx_.name;
+                NiceName(std::move(name));
+                pipe.closeWriteEnd();
+                ctx_.fd = pipe.readEnd();
+                ctx_.main(&ctx_);
+                return kCorruption;
+            }
         }
     }
 }
