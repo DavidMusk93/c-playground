@@ -21,6 +21,7 @@ namespace sun {
                 ERRRET(listen(fd_, config_.backlog) == -1, , { cleanup_.trigger(); }, 1, "listen");
             }
             LOGINFO("new UnixServer %s", path.c_str());
+            initialize();
         }
 
         TcpipServer::TcpipServer(short port, bool lazy) {
@@ -64,6 +65,7 @@ namespace sun {
                 SETSOCKOPT(fd_, SOL_SOCKET, SO_SNDTIMEO, tv,);
             }
             ERRRET(connect(fd_, SOCKADDR_EX(sa)) == -1, , , 1, "connect");
+            initialize();
         }
 
         Poll::Entry::Entry(int epoll_handler, int fd, unsigned events) : closeable_(true), fd_(fd) {

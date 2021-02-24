@@ -2,3 +2,5 @@ a.out
 cmake-build*
 .idea
 *.o
+*.tar.gz
+*.zip

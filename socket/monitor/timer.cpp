@@ -31,6 +31,7 @@ if(__y){\
         auto its = (struct itimerspec) config;
         timerfd_settime(fd_, 0, &its, nullptr);
         cleanup_ = Defer([this] { util::Close(fd_); });
+        initialize();
     }
 
     void Timer::OnTimeout(int fd) {

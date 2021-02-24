@@ -35,7 +35,7 @@ namespace sun {
         }
 
         bool valid() const {
-            return fd_ != -1;
+            return state_ == State::INITIALIZED;
         }
 
     protected:

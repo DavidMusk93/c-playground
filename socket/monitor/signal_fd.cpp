@@ -11,5 +11,6 @@ namespace sun {
             cleanup_ = Defer([this] { util::Close(fd_); });
             sigprocmask(SIG_BLOCK, &mask_, nullptr);
         }
+        initialize();
     }
 }
