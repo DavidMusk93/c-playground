@@ -20,9 +20,13 @@
 #define FORWARDER_NOTIFYSIGNAL SIGRTMIN+2
 #define FORWARDER_SERVICEPORT 23402
 
+#define PAYLOADHEADER_PARTIALLENGTH 8
+#define CLIENTINFO_EXPIREDTHRESHOLD 5000 // milliseconds
+
 struct PAYLOADHEADER_partial {
     int fd; // operation id (short) & dcs version (short) is trivial
     int dialogue;
+    double timestamp; // to filter expired session
 };
 
 struct FollowerContext {
@@ -37,11 +41,7 @@ struct FollowerContext {
 //        }
 //    }
 
-    void publish(ITERATOR_CLIENTINFO it) {
-        publish(*it);
-    }
-
-    void publish(CLIENTINFO &ci);
+    void publish(ITERATOR_CLIENTINFO it);
 
     FollowerContext() : pid(0), fd(-1), dialogue(-1), timestamp(0) {}
 };

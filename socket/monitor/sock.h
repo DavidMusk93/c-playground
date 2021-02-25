@@ -75,7 +75,7 @@ namespace sun {
             public:
                 using Callback = std::function<void(int)>;
 
-                Entry() : closeable_(true), fd_(-1) {}
+                Entry() : fd_(-1) {}
 
                 Entry(int epoll_handler, int fd, unsigned events);
 
@@ -86,7 +86,6 @@ namespace sun {
                 Entry &operator=(Entry &&entry) noexcept {
                     on_read.swap(entry.on_read);
                     on_close.swap(entry.on_close);
-                    std::swap(closeable_, entry.closeable_);
                     std::swap(fd_, entry.fd_);
                     cleanup_.swap(entry.cleanup_);
                     return *this;
@@ -104,9 +103,8 @@ namespace sun {
                     return static_cast<Entry &&>(*this);
                 }
 
-                int transferOwnership() {
-                    closeable_ = false;
-                    return fd_;
+                void giveupOwnership() {
+                    fd_ = -1;
                 }
 
             protected:

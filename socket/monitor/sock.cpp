@@ -68,7 +68,7 @@ namespace sun {
             initialize();
         }
 
-        Poll::Entry::Entry(int epoll_handler, int fd, unsigned events) : closeable_(true), fd_(fd) {
+        Poll::Entry::Entry(int epoll_handler, int fd, unsigned events) : fd_(fd) {
             if (Register(epoll_handler, fd, events) == 0) {
                 cleanup_ = Defer([epoll_handler, fd] {
                     Unregister(epoll_handler, fd);
@@ -78,9 +78,7 @@ namespace sun {
 
         Poll::Entry::~Entry() {
             cleanup_(); // unregister before close fd
-            if (closeable_) {
-                util::Close(fd_);
-            }
+            util::Close(fd_);
         }
 
         bool Poll::Entry::trigger(int fd, unsigned int events) const {

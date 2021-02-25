@@ -1,5 +1,7 @@
 #include "forwarder.h"
 
+#include <vector>
+
 #include <assert.h>
 #include <sys/signalfd.h>
 #include <poll.h>
@@ -29,13 +31,11 @@ DECLARECALLBACK(notify_connecting, ,);
 
 DECLARECALLBACK(peek_header, ,);
 
-void FollowerContext::publish(CLIENTINFO &ci) {
+void FollowerContext::publish(ITERATOR_CLIENTINFO it) {
     // @TODO make robust
-    if (sun::io::SendFd(fd, ci.fd)) {
-//        close(ci.fd); // close by poll entry
-        dialogue = -1;
-        timestamp = sun::util::Milliseconds();
-    }
+    sun::io::SendFd(fd, it->fd);
+    dialogue = -1;
+    timestamp = sun::util::Milliseconds();
 }
 
 namespace sun {
@@ -89,35 +89,47 @@ IMPLCALLBACK(notify_connecting) {
     auto p = MAPFOLLOWER.find(si.ssi_pid);
     if (p != MAPFOLLOWER.end()) { // a registered follower
         auto dialogue = p->second->dialogue = si.ssi_int;
-        // Case 1, connection come first
+        std::vector<ITERATOR_CLIENTINFO> invalid;
+        auto current = sun::util::Milliseconds();
         for (auto it = LISTCLIENT.begin(), end = LISTCLIENT.end(); it != end; ++it) {
+            if (current - it->timestamp > CLIENTINFO_EXPIREDTHRESHOLD) {
+                invalid.push_back(it);
+                continue;
+            }
+            // Case 1, connection come first
             if (it->dialogue == dialogue) {
                 p->second->publish(it);
+                sun::util::Close(it->fd);
                 LISTCLIENT.erase(it);
                 break;
             }
+        }
+        // Avoid memory leak
+        for (auto &it:invalid) {
+            LISTCLIENT.erase(it);
         }
     }
 }
 
 IMPLCALLBACK(peek_header) {
-    FUNCLOG("#%d is ready", fd);
     sun::io::Poll::Entry entry;
     LISTCLIENT.push_front({});
     auto it = LISTCLIENT.begin();
-    int nr = recv(fd, &*it, sizeof(CLIENTINFO), MSG_PEEK | MSG_WAITALL);
-    assert(nr == sizeof(CLIENTINFO));
+    int nr = recv(fd, &*it, PAYLOADHEADER_PARTIALLENGTH, MSG_PEEK | MSG_WAITALL);
+    assert(nr == PAYLOADHEADER_PARTIALLENGTH);
+    it->timestamp = sun::util::Milliseconds();
+    FUNCLOG("#%d is ready,%d", fd, it->dialogue);
     handler->pollInstance().remove(fd, &entry);
-//    it->fd = entry.transferOwnership(); // make sure unregister correctly
     it->fd = int(entry);
-    // Case 2, signal come first
     for (auto &p:MAPFOLLOWER) {
+        // Case 2, signal come first
         if (p.second->dialogue == it->dialogue) {
             p.second->publish(it);
             LISTCLIENT.pop_front();
-            break;
+            return;
         }
     }
+    entry.giveupOwnership();
 }
 
 #include <pwd.h>
