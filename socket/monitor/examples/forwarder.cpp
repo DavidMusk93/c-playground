@@ -120,6 +120,17 @@ IMPLCALLBACK(peek_header) {
     }
 }
 
+#include <pwd.h>
+
+static bool setguid(const char *username) {
+#define DEFAULTUSERNAME "trafodion"
+    auto *pwd = getpwnam(username ?: DEFAULTUSERNAME);
+    if (pwd) {
+        return setgid(pwd->pw_gid) == 0/*set gid first*/ && setuid(pwd->pw_uid) == 0;
+    }
+    return false;
+}
+
 #include "test.h"
 #include "status.h"
 
@@ -130,7 +141,7 @@ DECLAREPOLLSIGNALHANDLER(g_handler, sig_handler);
 #define LOCKFILE TMPDIR "/" PROGRAMNAME ".lock"
 #define LOGFILE TMPDIR "/" PROGRAMNAME ".log"
 
-MAIN() {
+MAIN_EX(argc, argv) {
     sun::FileLock fl(LOCKFILE, sun::RECORD);
     if (fl.setType(F_WRLCK).lock() == -1) {
         return kConflict;
@@ -154,8 +165,10 @@ MAIN() {
         execl(ctxp->exe.c_str(), ctxp->exe.c_str(), 0);
     };
     int notifier;
-    Daemon::Task onfork = [&notifier](Daemon::Context *ctxp) {
+    const char *username = argv[1];
+    Daemon::Task onfork = [&notifier, username](Daemon::Context *ctxp) {
         notifier = ctxp->fd;
+        LOGINFO("set {g,u}id %s", setguid(username) ? "SUCCESS" : "FAILURE");
     };
     Daemon daemon(PROGRAMNAME ".daemon", submain, onfork);
     daemon.run();
