@@ -4,3 +4,7 @@ cmake-build*
 *.o
 *.tar.gz
 *.zip
+*.so
+test
+test-*
+

@@ -24,6 +24,7 @@ aux_source_directory(functional FUNCTIONAL_SRC)
 aux_source_directory(feature FEATURE_SRC)
 aux_source_directory(db DB_SRC)
 aux_source_directory(boost BOOST_SRC)
+aux_source_directory(memory MEMORY_SRC)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tty)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -37,9 +38,9 @@ set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREAD ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 find_package(Boost 1.65.0)
-if(Boost_FOUND)
+if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
-endif()
+endif ()
 
 add_executable(${PROJECT_NAME}
         ${TTY_SRC} ${IO_SRC} ${PTY_SRC} ${MULTICAST_SRC}
@@ -47,6 +48,6 @@ add_executable(${PROJECT_NAME}
         ${NUM_SRC} ${CONTAINER_SRC} ${ALGORITHM_SRC} ${PTRACE_SRC}
         ${BUILTIN_SRC} ${PROCESS_SRC} ${GCC_SRC} ${STRUCTURE_SRC}
         ${SOCKET_SRC} ${META_SRC} ${FUNCTIONAL_SRC} ${FEATURE_SRC}
-        ${DB_SRC} ${BOOST_SRC})
+        ${DB_SRC} ${BOOST_SRC} ${MEMORY_SRC})
 
 target_link_libraries(${PROJECT_NAME} pthread ${Boost_LIBRARIES})
