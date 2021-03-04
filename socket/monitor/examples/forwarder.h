@@ -49,12 +49,37 @@ struct FollowerContext {
 namespace sun {
     class Forwarder : public Loop {
     public:
-        Forwarder();
+        explicit Forwarder(bool lazy = false);
 
         LIST_CLIENTINFO list_client;
         LIST_FOLLOWERCONTEXT list_follower;
         std::unordered_map<int/*pid*/, ITERATOR_FOLLOEWRCONTEXT> map_follower; // auxiliary data to boost search
         int error_count;
+
+        void initialize();
+
+        Forwarder &setIpcfile(std::string ipcfile) {
+            cfg_.ipcfile.swap(ipcfile);
+            return *this;
+        }
+
+        Forwarder &setRtsignal(int rtsignal) {
+            cfg_.rtsignal = rtsignal;
+            return *this;
+        }
+
+        Forwarder &setPort(int port) {
+            cfg_.port = port;
+            return *this;
+        }
+
+    private:
+        struct {
+            std::string ipcfile;
+            int rtsignal;
+            int port;
+        } cfg_;
+        bool initialized;
     };
 }
 

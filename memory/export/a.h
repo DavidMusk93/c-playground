@@ -1,0 +1,4 @@
+#ifndef C_PLAYGROUND_A_H
+#define C_PLAYGROUND_A_H
+
+#endif //C_PLAYGROUND_A_H

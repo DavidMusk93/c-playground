@@ -39,17 +39,30 @@ void FollowerContext::publish(ITERATOR_CLIENTINFO it) {
 }
 
 namespace sun {
-    Forwarder::Forwarder() : error_count(0) {
-        io::UnixServer unixServer(FORWARDER_IPCFILE);
-        pollInstance().registerEntry(unixServer.transferOwnership(), EPOLLIN, BINDCALLBACK(accept_follower, this));
-        SignalFd signalFd(FORWARDER_NOTIFYSIGNAL);
-        pollInstance().registerEntry(signalFd.transferOwnership(), EPOLLIN, BINDCALLBACK(notify_connecting, this));
-        io::TcpipServer tcpipServer(FORWARDER_SERVICEPORT);
-        if (tcpipServer.valid()) {
-            pollInstance().registerEntry(tcpipServer.transferOwnership(), EPOLLIN, BINDCALLBACK(accept_client, this));
-        } else {
-            ++error_count;
+    Forwarder::Forwarder(bool lazy) : error_count(0) {
+        cfg_ = {FORWARDER_IPCFILE, FORWARDER_NOTIFYSIGNAL, FORWARDER_SERVICEPORT};
+        initialized = false;
+        if (!lazy) {
+            initialize();
         }
+    }
+
+    void Forwarder::initialize() {
+        if (!initialized) {
+#define REGISTER(endpoint, callback) \
+if(endpoint.valid()){\
+    pollInstance().registerEntry(endpoint.transferOwnership(), EPOLLIN, BINDCALLBACK(callback, this));\
+}else{\
+    ++error_count;\
+}
+            io::UnixServer unixServer(cfg_.ipcfile);
+            REGISTER(unixServer, accept_follower);
+            SignalFd signalFd(cfg_.rtsignal);
+            REGISTER(signalFd, notify_connecting);
+            io::TcpipServer tcpipServer((short) cfg_.port);
+            REGISTER(tcpipServer, accept_client);
+        }
+        initialized = true;
     }
 }
 
@@ -132,6 +145,8 @@ IMPLCALLBACK(peek_header) {
     entry.giveupOwnership();
 }
 
+#ifndef NOFORWARDERMAIN
+
 #include <pwd.h>
 
 static bool setguid(const char *username) {
@@ -196,3 +211,5 @@ MAIN_EX(argc, argv) {
     close(notifier);
     return 0;
 }
+
+#endif
