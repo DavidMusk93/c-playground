@@ -24,6 +24,10 @@ namespace sun {
             setbuf(stdout, 0);
             setbuf(stderr, 0);
         }
+
+        bool FileHelper::Exist(const char *file) {
+            return ::access(file, F_OK) == 0;
+        }
     }
 
     FileLock::FileLock(std::string file, short type) : type_(type), fd_(-1), fl_{}, file_(std::move(file)) {}

@@ -14,6 +14,13 @@ namespace sun {
         bool ValidFd(int fd);
 
         void RedirectOutput(const char *file);
+
+        class FileHelper {
+        public:
+            FileHelper() = delete;
+
+            static bool Exist(const char *file);
+        };
     }
 
     enum LockType {

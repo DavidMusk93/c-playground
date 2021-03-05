@@ -6,6 +6,8 @@
 #include <jni.h>
 
 #include "forwarder.h"
+#include "util.h"
+#include "fs.h"
 
 namespace sun {
     class JniHelper {
@@ -39,7 +41,7 @@ namespace sun {
                 return;
             }
             auto cls = env->GetObjectClass(obj);
-            auto field_id = env->GetFieldID(cls, "forwarderPort"/*java style*/, JSIG_STRING);
+            auto field_id = env->GetFieldID(cls, "forwarderPort"/*java style*/, JSIG_INT);
             if (JniHelper::ClearException(env)) { // reflect failure
                 return;
             }
@@ -81,6 +83,9 @@ namespace sun {
         static int start(JNIFUNCTIONARGS(env,), jobject cfg) {
             if (ctx.initialized) {
                 return EXPORT_SUCCESS;
+            }
+            if (util::FileHelper::Exist(FORWARDER_ENABLELOGFILE)) {
+                util::RedirectOutput(FORWARDER_LOGFILE);
             }
             ctx.cfg.load(env, cfg);
             ctx.forwarder.reset(new sun::Forwarder(true));

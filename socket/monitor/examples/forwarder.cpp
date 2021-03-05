@@ -19,6 +19,8 @@
 
 using namespace std::placeholders;
 
+#define HANDLENOTIFY(pid, dialogue) static void handle_notify(FORWARDER*handler,int pid,int dialogue)
+#define HANDLENOTIFYAPPLY(pid, dialogue) handle_notify(handler,pid,dialogue)
 #define DECLARECALLBACK(name, fd, context) static void name(int fd,FORWARDER*context)
 #define IMPLCALLBACK(name) DECLARECALLBACK(name,fd,handler)
 #define BINDCALLBACK(name, context) std::bind(&name,_1,context)
@@ -28,6 +30,8 @@ DECLARECALLBACK(accept_client, ,);
 DECLARECALLBACK(accept_follower, ,);
 
 DECLARECALLBACK(notify_connecting, ,);
+
+DECLARECALLBACK(notify_connecting2, ,);
 
 DECLARECALLBACK(peek_header, ,);
 
@@ -83,25 +87,24 @@ IMPLCALLBACK(accept_follower) {
     it->fd = sock;
     it->timestamp = sun::util::Milliseconds();
     MAPFOLLOWER.insert({it->pid, it});
-    handler->pollInstance().registerEntry(sock, EPOLLRDHUP, {}, /*follower quit*/[handler](int fd) {
-        ITERATOR_FOLLOEWRCONTEXT it, end;
-        for (it = LISTFOLLOWER.begin(), end = LISTFOLLOWER.end(); it != end; ++it) {
-            if (it->fd == fd) {
-                LISTFOLLOWER.erase(it);
-                MAPFOLLOWER.erase(it->pid);
-                break;
-            }
-        }
-    });
+    handler->pollInstance().registerEntry(sock, EPOLLIN | EPOLLRDHUP,
+                                          BINDCALLBACK(notify_connecting2, handler),
+                                          [handler](int fd) { /*follower quit*/
+                                              for (auto it = LISTFOLLOWER.begin(), end = LISTFOLLOWER.end();
+                                                   it != end; ++it) {
+                                                  if (it->fd == fd) {
+                                                      LISTFOLLOWER.erase(it);
+                                                      MAPFOLLOWER.erase(it->pid);
+                                                      break;
+                                                  }
+                                              }
+                                          });
 }
 
-IMPLCALLBACK(notify_connecting) {
-    struct signalfd_siginfo si{};
-    read(fd, &si, sizeof(struct signalfd_siginfo));
-    FUNCLOG("dialogue,%d,%d,%d", si.ssi_int, si.ssi_signo, si.ssi_pid);
-    auto p = MAPFOLLOWER.find(si.ssi_pid);
-    if (p != MAPFOLLOWER.end()) { // a registered follower
-        auto dialogue = p->second->dialogue = si.ssi_int;
+HANDLENOTIFY(pid, dialogue) {
+    auto p = MAPFOLLOWER.find(pid);
+    if (p != MAPFOLLOWER.end()) { // a registered follower (authentication)
+        p->second->dialogue = dialogue;
         std::vector<ITERATOR_CLIENTINFO> invalid;
         auto current = sun::util::Milliseconds();
         for (auto it = LISTCLIENT.begin(), end = LISTCLIENT.end(); it != end; ++it) {
@@ -121,6 +124,25 @@ IMPLCALLBACK(notify_connecting) {
         for (auto &it:invalid) {
             LISTCLIENT.erase(it);
         }
+    }
+}
+
+IMPLCALLBACK(notify_connecting) {
+    struct signalfd_siginfo si{};
+    read(fd, &si, sizeof(struct signalfd_siginfo));
+    FUNCLOG("dialogue,%d,%d,%d", si.ssi_int, si.ssi_signo, si.ssi_pid);
+    HANDLENOTIFYAPPLY(si.ssi_pid, si.ssi_int);
+}
+
+IMPLCALLBACK(notify_connecting2) {
+    struct {
+        int pid;
+        int dialogue;
+    } msg{};
+    int nr = recv(fd, &msg, sizeof msg, MSG_WAITALL);
+    FUNCLOG("dialogue,%d,%d,%d", msg.dialogue, msg.pid, nr);
+    if (nr == sizeof msg) {
+        HANDLENOTIFYAPPLY(msg.pid, msg.dialogue);
     }
 }
 

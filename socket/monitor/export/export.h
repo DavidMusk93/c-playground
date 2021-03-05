@@ -24,8 +24,10 @@
 #define JSIGLIST(...) CONCAT(_JSIGLIST_,ARGS_LEN(__VA_ARGS__))(__VA_ARGS__)
 
 #define FORWARDER_DEFAULTPORT 23402
+#define FORWARDER_LOGFILE "/tmp/forwarder.log"
+#define FORWARDER_ENABLELOGFILE FORWARDER_LOGFILE "@enable"
 
-#define JNICLASS "x/y/z"
+#define JNICLASS "org/trafodion/dcs/server/DcsServer"
 #define JNIVRESION JNI_VERSION_1_6
 
 #define JNIFUNCTIONARGS(env, obj) JNIEnv*env,jobject obj
