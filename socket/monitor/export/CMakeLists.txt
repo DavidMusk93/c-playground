@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 project(forwarder)
 
 set(MONITOR monitor)
-set(CMAKE_CXX_FLAGS "-std=c++11 -g -fPIC")
+set(CMAKE_CXX_FLAGS "-std=c++11 -g -fPIC -Wall")
 
 if ("$ENV{TRAF_HOME}" STREQUAL "")
     message(FATAL_ERROR "trafodion environment not ready")
