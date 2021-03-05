@@ -33,6 +33,12 @@
 #define JNIFUNCTIONARGS(env, obj) JNIEnv*env,jobject obj
 #define JNIHOOKPOINTARGS(vm, reserved) JavaVM*vm,void*reserved
 
+#define JNIFUNCTION_TRACEBEGIN FUNCLOG("JNIFUNCTION BEGIN")
+#define JNIFUNCTION_TRACEEND const char*__func=__func__;Defer __endcall([__func]{LOGINFO("@%s JNIFUNCTION END",__func);})
+#define JNIFUNCTION_TRACEENTRY \
+JNIFUNCTION_TRACEBEGIN;\
+JNIFUNCTION_TRACEEND
+
 enum EXPORT_STATUS {
     EXPORT_SUCCESS = 0,
     EXPORT_FAILURE = 1,

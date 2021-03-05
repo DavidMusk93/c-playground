@@ -6,8 +6,6 @@
 #include <jni.h>
 
 #include "forwarder.h"
-#include "util.h"
-#include "fs.h"
 
 namespace sun {
     class JniHelper {
@@ -49,12 +47,20 @@ namespace sun {
         }
     };
 
+    namespace jni {
+        static int stop(JNIFUNCTIONARGS(,));
+    }
+
     static struct JniContext {
         JavaVM *vm;
         std::thread service;
         std::unique_ptr<sun::Forwarder> forwarder;
         NativeConfig cfg;
         bool initialized{false};
+
+        ~JniContext() {
+            jni::stop(0, 0);
+        }
     } ctx;
 
     namespace jni {
@@ -81,11 +87,9 @@ namespace sun {
         };
 
         static int start(JNIFUNCTIONARGS(env,), jobject cfg) {
+            JNIFUNCTION_TRACEENTRY;
             if (ctx.initialized) {
                 return EXPORT_SUCCESS;
-            }
-            if (util::FileHelper::Exist(FORWARDER_ENABLELOGFILE)) {
-                util::RedirectOutput(FORWARDER_LOGFILE);
             }
             ctx.cfg.load(env, cfg);
             ctx.forwarder.reset(new sun::Forwarder(true));
@@ -102,6 +106,7 @@ namespace sun {
         }
 
         static int stop(JNIFUNCTIONARGS(,)) {
+            JNIFUNCTION_TRACEENTRY;
             if (ctx.initialized && ctx.service.joinable()) {
                 ctx.forwarder->pollInstance().quit();
                 ctx.service.join();
@@ -125,6 +130,9 @@ static JNINativeMethod jni_methods[] = {
 #endif
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JNIHOOKPOINTARGS(vm,)) {
+    if (sun::util::FileHelper::Exist(FORWARDER_ENABLELOGFILE)) {
+        sun::util::RedirectOutput(FORWARDER_LOGFILE);
+    }
     sun::ctx.vm = vm;
     do {
         auto env = sun::JniHelper::GetEnv(vm);

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 project(monitor)
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -g -fPIC")
+set(CMAKE_CXX_FLAGS "-std=c++11 -g -fPIC -Wall")
 
 include_directories(.)
 include_directories(./tests)

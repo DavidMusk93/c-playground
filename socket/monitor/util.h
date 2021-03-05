@@ -40,8 +40,8 @@ namespace sun {
             }
 
         private:
-            std::string tag_;
             double ms_;
+            std::string tag_;
         };
 
         class Daemon {
