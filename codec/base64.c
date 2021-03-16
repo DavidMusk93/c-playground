@@ -6,18 +6,24 @@
 #include "macro.h"
 
 static char base64_table[256];
+static char base64_rtable[256];
 
 static GCCATTRCTOR void base64_table_init() {
+#define ASSIGN(__x, __y) \
+base64_table[__x]=__y;\
+base64_rtable[__y]=__x
     int i;
     for (i = 0; i < 26; ++i) {
-        base64_table[i] = 'A' + i;
-        base64_table[26 + i] = 'a' + i;
+        ASSIGN(i, 'A' + i);
+        ASSIGN(i + 26, 'a' + i);
     }
     for (i = 0; i < 10; i++) {
-        base64_table[52 + i] = '0' + i;
+        ASSIGN(i + 52, '0' + i);
     }
-    base64_table[62] = '+';
-    base64_table[63] = '/';
+    ASSIGN(62, '+');
+    ASSIGN(63, '/');
+#undef ASSIGN
+    base64_rtable['='] = 0; /*padding character*/
 }
 
 #define BASE64GROUPBYTECOMMON(__prefix, __type, __x, __self) static inline unsigned char __prefix##__x(__type*self)
@@ -100,6 +106,37 @@ BASE64GROUPBYTE(3, self) {
 }
 
 #undef BASE64GROUPBYTECOMMON
+#define INPUTSTRCHECK(__x, __error_code) if(!__x||!*__x)return __error_code
+
+char *base64_decode(const char *src) {
+    INPUTSTRCHECK(src, 0);
+    union base64_group_u group;
+    int sz = (int) strlen(src);
+    if (sz & 0x3) { /*length checking*/
+        return 0;
+    }
+    char *dst = malloc(sz / 4 * 3 + 1/*null-terminated*/);
+    if (dst) {
+        char *p = dst;
+        unsigned char *q = (unsigned char *) src;
+        for (; *q; p += 3, q += 4) {
+            group.i = 0;
+            unsigned char x = base64_rtable[q[0]];
+            group.b[0] |= x << 2; /*h6*/
+            x = base64_rtable[q[1]];
+            group.b[0] |= x >> 4; /*l2*/
+            group.b[1] |= (x & 0xf) << 4; /*h4*/
+            x = base64_rtable[q[2]];
+            group.b[1] |= x >> 2; /*l4*/
+            group.b[2] |= (x & 0x3) << 6; /*h2*/
+            x = base64_rtable[q[3]];
+            group.b[2] |= x; /*l6*/
+            memcpy(p, group.a, 3);
+        }
+        *p = 0;
+    }
+    return dst;
+}
 
 char *base64_encode(const char *src) {
     int done = 0;
@@ -150,8 +187,9 @@ MAIN_EX(argc, argv) {
     union base64_group_u group;
     LOG("sizeof(union base64_group_u)=%d,%d", (int) sizeof(union base64_group_u), (int) sizeof(group.b));
     if (argc > 1) {
-        char *dst GCCATTRCLEANUP(free_pp) = base64_encode(argv[1]);
-        LOG("%s", dst);
+        char *s1 GCCATTRCLEANUP(free_pp) = base64_encode(argv[1]);
+        char *s2 GCCATTRCLEANUP(free_pp) = base64_decode(s1);
+        LOG("'%s','%s','%s'", argv[1], s1, s2);
     }
     return argc == 1;
 }
