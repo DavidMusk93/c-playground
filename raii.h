@@ -7,24 +7,57 @@
 
 #include <functional>
 
-namespace sun{
-    using Closure=std::function<void()>;
-    class Defer{
+namespace sun {
+    using Closure = std::function<void()>;
+
+    class Defer {
     public:
-        Defer(Closure&&closure){
+        Defer() = default;
+
+        explicit Defer(Closure closure) {
             closure_.swap(closure);
         }
-        ~Defer(){
-            if(closure_){
+
+        Defer(Defer &&defer) noexcept {
+            *this = defer.move();
+        }
+
+        ~Defer() {
+            if (closure_) {
                 closure_();
             }
         }
-        void reset(){
-            if(closure_){
+
+        Defer &operator=(Defer &&defer) noexcept {
+            closure_.swap(defer.closure_);
+            return *this;
+        }
+
+        Defer &&move() {
+            return static_cast<Defer &&>(*this);
+        }
+
+        void cancel() {
+            Closure trivial;
+            closure_.swap(trivial);
+        }
+
+        void trigger() {
+            if (closure_) {
                 Closure trivial;
+                closure_();
                 closure_.swap(trivial);
             }
         }
+
+        void operator()() {
+            trigger();
+        }
+
+        void swap(Defer &defer) {
+            closure_.swap(defer.closure_);
+        }
+
     private:
         Closure closure_;
     };
