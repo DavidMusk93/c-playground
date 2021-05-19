@@ -175,6 +175,8 @@ void exit_handler() {
     LOG("EXIT");
 }
 
+//#define USE_EVENT 1
+
 int main() {
     atexit(&exit_handler);
     TrivialLocal local;
@@ -198,6 +200,7 @@ int main() {
     });
 //    spoiler.detach();
     LOG("@CONSUMER BEFORE %p", local.Get());
+#ifdef USE_EVENT
     struct pollfd pfd{.fd=notifier, .events=POLLIN};
     while (poll(&pfd, 1, -1) != -1) {
         int64_t event{};
@@ -209,11 +212,16 @@ int main() {
             break;
         }
     }
-//    while (queue.ready()) {
-//        auto t = queue.get();
-//        printf("@CONSUME %d\n", t);
-//    }
-    spoiler.join();
+#else
+    auto consumer = std::thread([] {
+        while (queue.ready()) {
+            auto t = queue.get();
+            printf("@CONSUME %d\n", t);
+        }
+    });
+    consumer.detach();
+#endif
     producer.join();
+    spoiler.join();
     LOG("@CONSUMER AFTER %p", local.Get());
 }
