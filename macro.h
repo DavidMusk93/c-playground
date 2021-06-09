@@ -10,6 +10,7 @@
 #include <error.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #define MAIN() \
 int main()
@@ -50,6 +51,10 @@ if(error){\
 
 #define log(fmt, ...) printf(fmt "\n",##__VA_ARGS__)
 #define LOG log
+
+#define __log(fp, fmt, ...) fprintf(fp,fmt "\n",##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) __log(stderr,fmt,##__VA_ARGS__)
+#define LOG_INFO(fmt, ...) __log(stdout,fmt,##__VA_ARGS__)
 
 #define dimension_of(x) (sizeof(x)/sizeof(*x))
 

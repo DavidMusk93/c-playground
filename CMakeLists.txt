@@ -43,6 +43,11 @@ if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
 endif ()
 
+find_package(double-conversion CONFIG)
+if (double-conversion_FOUND)
+    message(STATUS ${double-conversion_FIND_VERSION})
+endif ()
+
 add_executable(${PROJECT_NAME}
         ${TTY_SRC} ${IO_SRC} ${PTY_SRC} ${MULTICAST_SRC}
         ${CRC_SRC} ${TIME_SRC} ${TRIVIAL_SRC} ${CLASS_SRC}
