@@ -32,8 +32,6 @@ namespace sun {
             return wheel_[i_];
         }
 
-    protected:
-
     private:
         Slot wheel_[N];
         int i_;

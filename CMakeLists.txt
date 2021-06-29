@@ -26,6 +26,7 @@ aux_source_directory(db DB_SRC)
 aux_source_directory(boost BOOST_SRC)
 aux_source_directory(memory MEMORY_SRC)
 aux_source_directory(codec CODEC_SRC)
+aux_source_directory(string STRING_SRC)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/tty)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -54,6 +55,7 @@ add_executable(${PROJECT_NAME}
         ${NUM_SRC} ${CONTAINER_SRC} ${ALGORITHM_SRC} ${PTRACE_SRC}
         ${BUILTIN_SRC} ${PROCESS_SRC} ${GCC_SRC} ${STRUCTURE_SRC}
         ${SOCKET_SRC} ${META_SRC} ${FUNCTIONAL_SRC} ${FEATURE_SRC}
-        ${DB_SRC} ${BOOST_SRC} ${MEMORY_SRC} ${CODEC_SRC})
+        ${DB_SRC} ${BOOST_SRC} ${MEMORY_SRC} ${CODEC_SRC}
+        ${STRING_SRC})
 
 target_link_libraries(${PROJECT_NAME} pthread ${Boost_LIBRARIES})

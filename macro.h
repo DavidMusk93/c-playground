@@ -125,6 +125,7 @@ typedef double f64;
 #define ARGCONCAT(__s, ...) CONCAT(__ARGCONCAT_,ARGS_LEN(__VA_ARGS__))(__s,__VA_ARGS__)
 #endif
 
+#define __ATTR __GCCATTR
 #define __GCCATTR(x) __attribute__((x))
 #define GCCATTRCTOR __GCCATTR(constructor)
 #define GCCATTRCLEANUP(fn) __GCCATTR(__cleanup__(fn))
