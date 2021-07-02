@@ -4,7 +4,7 @@
 #include "base.h"
 
 namespace sun {
-    class EndPoint : public nocopy {
+    class EndPoint : public nocopy, public transferable {
     public:
         enum class State : char {
             NOTHINGNESS,
@@ -12,13 +12,9 @@ namespace sun {
             TRANSFERRED,
         };
 
-        EndPoint() : fd_(-1), state_(State::NOTHINGNESS) {}
+        EndPoint() : state_(State::NOTHINGNESS) {}
 
         virtual ~EndPoint() = default;
-
-        explicit operator int() const {
-            return fd_;
-        };
 
         virtual int transferOwnership() {
             state_ = State::TRANSFERRED;
@@ -39,7 +35,6 @@ namespace sun {
         }
 
     protected:
-        int fd_;
         State state_;
         Defer cleanup_;
     };

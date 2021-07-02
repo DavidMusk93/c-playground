@@ -68,6 +68,21 @@ namespace sun {
             initialize();
         }
 
+        TcpipClient::TcpipClient(const char *ip, short port) {
+            cleanup_ = Defer([this] { util::Close(fd_); });
+            fd_ = socket(AF_INET, config_.type, 0);
+            struct sockaddr_in sa{};
+            sa.sin_family = AF_INET;
+            ERRRET(inet_aton(ip, &sa.sin_addr) == 0, , , 0, "invalid ip");
+            sa.sin_port = htons(port);
+            if (config_.timeout > 0) {
+                struct timeval tv{config_.timeout, 0};
+                SETSOCKOPT(fd_, SOL_SOCKET, SO_SNDTIMEO, tv,);
+            }
+            ERRRET(connect(fd_, SOCKADDR_EX(sa)) == -1, , , 1, "connect");
+            initialize();
+        }
+
         Poll::Entry::Entry(int epoll_handler, int fd, unsigned events) : fd_(fd) {
             if (Register(epoll_handler, fd, events) == 0) {
                 cleanup_ = Defer([epoll_handler, fd] {

@@ -37,7 +37,7 @@ namespace sun {
             int nfds, nr;
             char buf[4096];
             struct pollfd pfds[2]{};
-            pfds[0] = {.fd=quitHandler(), .events=POLLIN,};
+            pfds[0] = {.fd=notifier(), .events=POLLIN,};
             pfds[1] = {.fd=inotify_handler_, .events=POLLIN,};
             for (;;) {
                 POLL(nfds, poll, pfds, 2, config_.timeout);

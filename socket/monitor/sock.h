@@ -44,7 +44,7 @@ namespace sun {
 
         private:
             struct {
-                int timeout{2000}; // seconds
+                int timeout{2000}; // milliseconds
                 int type{SOCK_STREAM};
             } config_;
         };
@@ -66,6 +66,19 @@ namespace sun {
                 int reuseaddr{1};
                 int reuseport{0};
                 short port{0};
+            } config_;
+        };
+
+        class TcpipClient : public EndPoint {
+        public:
+            TcpipClient(const char *ip, short port);
+
+            ~TcpipClient() override = default;
+
+        private:
+            struct {
+                int timeout{2000};
+                int type{SOCK_STREAM};
             } config_;
         };
 

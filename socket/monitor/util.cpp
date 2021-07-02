@@ -1,6 +1,7 @@
 #include "util.h"
 #include "pipe.h"
 #include "status.h"
+#include "runner.h"
 
 #include <time.h>
 #include <signal.h>
@@ -78,11 +79,15 @@ namespace sun {
         }
 
         int Sleep(int ms) {
-            static std::unique_ptr<Pipe> pipe;
-            if (!pipe) {
-                pipe.reset(new Pipe());
+//            static std::unique_ptr<Pipe> pipe;
+            static std::unique_ptr<Notifier> blockobj;
+            if (!blockobj) {
+                blockobj.reset(new Notifier());
             }
-            struct pollfd pfd{.fd=pipe->readEnd(), .events=POLLIN};
+            if (ms <= 0 || ms >= 0x1fffff) {
+                return 0;
+            }
+            struct pollfd pfd{.fd=blockobj->fd(), .events=POLLIN};
             return poll(&pfd, 1, ms);
         }
 

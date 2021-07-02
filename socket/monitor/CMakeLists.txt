@@ -31,3 +31,7 @@ if (BUILDEXES)
     TEST_BUILD(forwarder
             examples/forwarder.cpp)
 endif ()
+TEST_BUILD(listener_client
+        tests/test_listener_client.cpp)
+TEST_BUILD(listener_server
+        tests/test_listener_server.cpp)

@@ -54,7 +54,7 @@ namespace sun {
             int nfds, nr;
             Defer on_done([this] { close(nl_sock_); });
             struct pollfd pfds[2]{};
-            pfds[0] = {.fd=quitHandler(), .events=POLLIN,};
+            pfds[0] = {.fd=notifier(), .events=POLLIN,};
             pfds[1] = {.fd=nl_sock_, .events=POLLIN,};
             for (;;) {
                 POLL(nfds, poll, pfds, 2, config_.timeout);

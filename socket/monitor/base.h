@@ -20,6 +20,12 @@
 #define LOGERROR(fmt, ...) __LOG(stderr,fmt,##__VA_ARGS__)
 #define FUNCLOG(fmt, ...) LOGINFO("@%s " fmt,__func__,##__VA_ARGS__)
 
+#ifndef NDEBUG
+#define LOGDEBUG LOGINFO
+#else
+#define LOGDEBUG(fmt,...)
+#endif
+
 #define ERRNOSTR strerror(errno)
 #define __ATTR(x) __attribute__((x))
 
@@ -93,6 +99,28 @@ namespace sun {
 
     private:
         Closure closure_;
+    };
+
+    class transferable {
+    public:
+        transferable() : fd_(-1) {}
+
+        virtual int transfer() {
+            auto fd = fd_;
+            fd_ = -1;
+            return fd;
+        }
+
+        int fd() const {
+            return fd_;
+        }
+
+        explicit operator int() const {
+            return fd_;
+        }
+
+    protected:
+        int fd_;
     };
 }
 
