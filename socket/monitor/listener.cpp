@@ -15,8 +15,9 @@ namespace sun {
         }
         if (lastest_pingts > 0 && (
                 rtt < 0 /*first ping, without pong*/||
-                now - lastest_pingts > HEARTBEAT_DURATION + 5 * rtt /*pong timeout*/)) {
+                now - lastest_pongts > HEARTBEAT_DURATION + 20 * minrtt /*pong timeout*/)) {
             --retry;
+            LOGINFO("no pong form peer(%.3f,%.3f,%.3f), remaining retry: %d", rtt, minrtt, maxrtt, retry);
         }
         io::MsgHeartbeat msg(now);
         io::MsgRaw raw(io::MSGPING);
@@ -29,13 +30,21 @@ namespace sun {
     }
 
     void Heartbeat::reset() {
-        lastest_pingts = -1;
+        lastest_pingts = lastest_pongts = -1;
         rtt = -1;
+        minrtt = HEARTBEAT_DURATION;
+        maxrtt = -HEARTBEAT_DURATION;
         retry = HEARTBEAT_MAXRETRY;
     }
 
     void Heartbeat::updateRTT(double d) {
         rtt = d;
+        if (minrtt > d) {
+            minrtt = d;
+        }
+        if (maxrtt < d && d < HEARTBEAT_DURATION / 10) {
+            maxrtt = d;
+        }
         retry = HEARTBEAT_MAXRETRY;
     }
 
@@ -63,6 +72,7 @@ namespace sun {
                 }
                 case io::MSGPONG: {
                     if (msght.unpack(&r)) {
+                        listener->heartbeat.lastest_pongts = now;
                         listener->heartbeat.updateRTT(now - msght.timestamp);
                         LOGINFO("pong rrt:%.3fms", listener->heartbeat.rtt);
                     } else {

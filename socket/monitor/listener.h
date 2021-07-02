@@ -17,11 +17,13 @@ namespace sun {
     struct Reader;
 
     struct Heartbeat {
-        double lastest_pingts;
-        double rtt;
+        double lastest_pingts, lastest_pongts;
+        double rtt, minrtt, maxrtt; /*per session*/
         int retry;
 
-        Heartbeat() : lastest_pingts(-1), rtt(0), retry(HEARTBEAT_MAXRETRY) {}
+        Heartbeat() : lastest_pingts(-1), lastest_pongts(-1),
+                      rtt(-1), minrtt(HEARTBEAT_DURATION), maxrtt(-HEARTBEAT_DURATION),
+                      retry(HEARTBEAT_MAXRETRY) {}
 
         bool ping(int fd, Reader *r);
 
