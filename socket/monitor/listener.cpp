@@ -15,10 +15,11 @@ namespace sun {
         }
         if (lastest_pingts > 0 && (
                 rtt < 0 /*first ping, without pong*/||
-                now - lastest_pongts > HEARTBEAT_DURATION + 20 * minrtt /*pong timeout*/)) {
+                now - lastest_pongts > HEARTBEAT_DURATION + 10 * maxrtt /*pong timeout*/)) {
             --retry;
             LOGINFO("no pong form peer(%.3f,%.3f,%.3f), remaining retry: %d", rtt, minrtt, maxrtt, retry);
         }
+        LOGINFO("send ping");
         io::MsgHeartbeat msg(now);
         io::MsgRaw raw(io::MSGPING);
         raw.payload = msg.pack();
@@ -42,7 +43,7 @@ namespace sun {
         if (minrtt > d) {
             minrtt = d;
         }
-        if (maxrtt < d && d < HEARTBEAT_DURATION / 10) {
+        if (maxrtt < d && d < HEARTBEAT_DURATION / 20.) {
             maxrtt = d;
         }
         retry = HEARTBEAT_MAXRETRY;
@@ -74,7 +75,7 @@ namespace sun {
                     if (msght.unpack(&r)) {
                         listener->heartbeat.lastest_pongts = now;
                         listener->heartbeat.updateRTT(now - msght.timestamp);
-                        LOGINFO("pong rrt:%.3fms", listener->heartbeat.rtt);
+                        LOGINFO("receive pong rrt:%.3fms", listener->heartbeat.rtt);
                     } else {
                         listener->onUnpackError();
                     }

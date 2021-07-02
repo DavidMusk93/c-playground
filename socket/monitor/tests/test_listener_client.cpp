@@ -47,7 +47,7 @@ MAIN_EX(argc, argv) {
             }
             int a, b;
             if (parseInput(buf, a, b)) {
-                LOGINFO("input %d,%d", a, b);
+                LOGINFO("request: %d,%d", a, b);
             } else {
                 LOGERROR("invalid input");
             }
@@ -59,10 +59,10 @@ MAIN_EX(argc, argv) {
         if (pfds[1].revents == POLLIN) {
             MsgRaw raw;
             if (!raw.read(sock)) {
-                LOGERROR("@FATAL server may abort, quit");
+                LOGERROR("@FATAL server may quit or abort this connection");
                 break;
             }
-            LOGINFO("message type: %s", strmsgtype(raw.type));
+//            LOGINFO("message type: %s", strmsgtype(raw.type));
             Unpacker r(raw.payload);
             switch (raw.type) {
                 case MSGRESPONSE: {
@@ -75,10 +75,13 @@ MAIN_EX(argc, argv) {
                     break;
                 }
                 case MSGPING: {
+                    LOGINFO("receive ping, send pong");
                     raw.type = MSGPONG;
                     raw.write(sock);
                     break;
                 }
+                default:
+                    LOGERROR("unknown message");
             }
         }
     }

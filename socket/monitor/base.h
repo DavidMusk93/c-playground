@@ -15,15 +15,15 @@
 #define WHEREFALSE while(false)
 #define INITMEMBER(x) x##_(x)
 
-#define __LOG(os, fmt, ...) fprintf(os,"%s #%d " fmt "\n",sun::util::Now(nullptr),sun::util::GetPid(),##__VA_ARGS__)
-#define LOGINFO(fmt, ...) __LOG(stdout,fmt,##__VA_ARGS__)
-#define LOGERROR(fmt, ...) __LOG(stderr,fmt,##__VA_ARGS__)
+#define __LOG(os, level, fmt, ...) fprintf(os,"%s #%d " #level " " fmt "\n",sun::util::Now(nullptr),sun::util::GetPid(),##__VA_ARGS__)
+#define LOGINFO(fmt, ...) __LOG(stdout,INFO,fmt,##__VA_ARGS__)
+#define LOGERROR(fmt, ...) __LOG(stderr,ERROR,fmt,##__VA_ARGS__)
 #define FUNCLOG(fmt, ...) LOGINFO("@%s " fmt,__func__,##__VA_ARGS__)
 
 #ifndef NDEBUG
-#define LOGDEBUG LOGINFO
+#define LOGDEBUG __LOG(stdout,DEBUG,fmt,##__VA_ARGS__)
 #else
-#define LOGDEBUG(fmt,...)
+#define LOGDEBUG(fmt, ...)
 #endif
 
 #define ERRNOSTR strerror(errno)

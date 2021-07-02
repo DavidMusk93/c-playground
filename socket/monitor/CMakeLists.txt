@@ -9,6 +9,8 @@ include_directories(./tests)
 include_directories(./examples)
 aux_source_directory(. SRCS)
 
+add_definitions(-DNDEBUG)
+
 add_library(${PROJECT_NAME} STATIC ${SRCS})
 target_link_libraries(${PROJECT_NAME} pthread)
 
