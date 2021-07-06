@@ -50,6 +50,7 @@ MAIN_EX(argc, argv) {
                 LOGINFO("request: %d,%d", a, b);
             } else {
                 LOGERROR("invalid input");
+                continue;
             }
             MsgRequest res(a, b);
             MsgRaw raw(MSGREQUEST);

@@ -78,6 +78,11 @@ namespace sun {
             return pid;
         }
 
+        int GetTid() {
+            static thread_local int tid = (int) syscall(SYS_gettid);
+            return tid;
+        }
+
         int Sleep(int ms) {
 //            static std::unique_ptr<Pipe> pipe;
             static std::unique_ptr<Notifier> blockobj;

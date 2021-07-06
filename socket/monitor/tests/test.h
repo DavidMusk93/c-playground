@@ -2,6 +2,11 @@
 #define MONITOR_TEST_H
 
 #include <signal.h>
+#include <stdio.h>
+
+#define SETNOBUF() \
+setbuf(stdout,nullptr);\
+setbuf(stderr,nullptr)
 
 #define SIGBLOCK() \
 sigset_t __ss{};\

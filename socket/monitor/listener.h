@@ -25,7 +25,7 @@ namespace sun {
                       rtt(-1), minrtt(HEARTBEAT_DURATION), maxrtt(-HEARTBEAT_DURATION),
                       retry(HEARTBEAT_MAXRETRY) {}
 
-        bool ping(int fd, Reader *r);
+        bool ping(int fd, Listener *ctx);
 
         void reset();
 
@@ -54,7 +54,7 @@ namespace sun {
 
         explicit Writer(Listener *listener) : listener(listener) {}
 
-        void pub(io::MsgRaw &&msg);
+        void pub(io::MsgRaw &&msg, Listener *ctx);
 
         void write();
     };
@@ -67,20 +67,14 @@ namespace sun {
 #define OPMASK (1UL<<63)
     };
 
-    struct Listener {
-        enum class State : char {
-            UNINITIALIZED,
-            WORK,
-            IDLE,
-            QUIT,
-        };
+    struct Listener : public stateful {
         int activefd, peerfd;
         Notifier msghub;
         TaskRunner worker;
+        tRunner timer;
         Heartbeat heartbeat;
         Reader r;
         Writer w;
-        std::atomic<State> state;
         Metrics metrics;
         std::mutex mtx;
         std::vector<Closure> closures;
@@ -88,8 +82,6 @@ namespace sun {
         explicit Listener(short port);
 
         ~Listener();
-
-        bool valid() const;
 
         bool idle() const;
 
@@ -107,6 +99,8 @@ namespace sun {
 
         void runOnLoop(Closure closure);
 
+        void runAfter(fn_job_t job, void *arg, unsigned ms, int type = TIMERTASK_ONCE);
+
         void run();
 
 //    private:
@@ -116,7 +110,13 @@ namespace sun {
 
         static void *Work(void *);
 
-    private:
+        static void *tWork(void *);
+
+        static void *tWork2(void *);
+
+        static void *Ping(void *);
+
+//    private:
         static constexpr const eventfd_t kNotifySmall = 1UL;
         static constexpr const eventfd_t kNotifyMedium = 1UL << 31;
         static constexpr const eventfd_t kNotifyLarge = 1UL << 63;

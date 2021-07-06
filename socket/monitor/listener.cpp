@@ -5,9 +5,9 @@
 namespace sun {
 #define NOW() sun::util::Milliseconds()
 
-    bool Heartbeat::ping(int fd, Reader *r) {
+    bool Heartbeat::ping(int fd, Listener *ctx) {
         auto now = NOW();
-        if (now - r->lastest_readts < HEARTBEAT_DURATION) { /*no need to ping*/
+        if (now - ctx->r.lastest_readts < HEARTBEAT_DURATION) { /*no need to ping*/
             return true;
         }
         if (!retry) {
@@ -23,11 +23,14 @@ namespace sun {
         io::MsgHeartbeat msg(now);
         io::MsgRaw raw(io::MSGPING);
         raw.payload = msg.pack();
-        if (raw.write(fd)) {
-            lastest_pingts = now;
-            return true;
-        }
-        return false;
+//        if (raw.write(fd)) { /*write should run in io-thread*/
+//            lastest_pingts = now;
+//            return true;
+//        }
+//        return false;
+        lastest_pingts = now;
+        ctx->w.pub(raw.move(), ctx);
+        return true;
     }
 
     void Heartbeat::reset() {
@@ -54,10 +57,10 @@ namespace sun {
         if (raw.read(listener->peerfd)) {
             auto now = NOW();
             io::Unpacker r(raw.payload);
-            lastest_readts = now;
             switch (raw.type) {
                 case io::MSGREQUEST: {
                     if (msgreq.unpack(&r)) {
+                        lastest_readts = now;
                         listener->metrics.ops |= OPMASK;
                         Task t;
                         t.hook.oncall = [](void *arg) { LOGINFO("@WORKER task start(%p)", arg); };
@@ -84,15 +87,17 @@ namespace sun {
                 default:
                     LOGERROR("unknown message type: %d", raw.type);
             }
+            /*it is better to read as more as possible?*/
         } else {
             listener->onDisconnect();
         }
     }
 
-    void Writer::pub(io::MsgRaw &&msg) {
+    void Writer::pub(io::MsgRaw &&msg, Listener *ctx) {
         mtx.lock();
         msgs.emplace_back(msg.move());
         mtx.unlock();
+        ctx->msghub.notify(Listener::kNotifySmall);
     }
 
     void Writer::write() {
@@ -119,18 +124,18 @@ namespace sun {
     }
 
     Listener::Listener(short port) : activefd(-1), peerfd(-1), msghub(),
-                                     r(this), w(this),
-                                     state(State::UNINITIALIZED), metrics() {
+                                     r(this), w(this), metrics() {
         io::TcpipServer server(port);
         if (server.valid()) {
             activefd = server.transferOwnership();
-            onIdle();
+            setstate(State::INITIALIZED);
         }
     }
 
     Listener::~Listener() {
-        if (valid()) {
+        if (initialized()) {
             msghub.notify(kNotifyLarge);
+            timer.stop();
             worker.stop();
             if (activefd != -1) {
                 close(activefd);
@@ -138,24 +143,20 @@ namespace sun {
         }
     }
 
-    bool Listener::valid() const {
-        return state != State::UNINITIALIZED;
-    }
-
     bool Listener::idle() const {
-        return state.load(std::memory_order_acquire) == State::IDLE;
+        return getstate() == State::IDLE;
     }
 
     bool Listener::work() const {
-        return state.load(std::memory_order_acquire) == State::WORK;
+        return getstate() == State::WORK;
     }
 
     void Listener::onWork() {
-        state.store(State::WORK, std::memory_order_release);
+        setstate(State::WORK);
     }
 
     void Listener::onIdle() {
-        state.store(State::IDLE, std::memory_order_acquire);
+        setstate(State::IDLE);
     }
 
     void Listener::onConnect() {
@@ -184,8 +185,7 @@ namespace sun {
         io::MsgResponse res("invalid message", {});
         io::MsgRaw raw(io::MSGRESPONSE);
         raw.payload = res.pack();
-        w.pub(raw.move());
-        msghub.notify(kNotifySmall);
+        w.pub(raw.move(), this);
     }
 
     void Listener::runOnLoop(Closure closure) {
@@ -197,18 +197,34 @@ namespace sun {
         }
     }
 
+    void Listener::runAfter(fn_job_t job, void *arg, unsigned int ms, int type) {
+        if (!job || (type != TIMERTASK_ONCE && type != TIMERTASK_REPEATED)) {
+            return;
+        }
+        timer.post({ms, type, job, arg});
+    }
+
     void Listener::run() {
         worker.start();
-#define POLLFDLEN 3
+        timer.start();
+#define POLLFDLEN 4
 #define POLLFDSET(x, _1, _2) (x).fd=(_1),(x).events=(_2)
         struct pollfd pfds[POLLFDLEN]{};
+        auto &activepfd = pfds[2];
+        auto &positivepfd = pfds[3];
         int rc;
         eventfd_t ev;
         POLLFDSET(pfds[0], msghub.fd(), POLLIN);
-        POLLFDSET(pfds[1], activefd, POLLIN);
-        POLLFDSET(pfds[2], peerfd, POLLIN);
+        POLLFDSET(pfds[1], timer.fd(), POLLIN);
+        POLLFDSET(activepfd, activefd, POLLIN);
+        POLLFDSET(positivepfd, peerfd, POLLIN);
+        LOGINFO("timer state: %d", (int) timer.getstate());
+        timer.post({1000, TIMERTASK_REPEATED, tWork, nullptr}); /*timer test 1*/
+        timer.post({2000, TIMERTASK_REPEATED, tWork2, nullptr}); /*timer test 2*/
+        timer.post({HEARTBEAT_DURATION, TIMERTASK_REPEATED, Ping, this}); /*heartbeat*/
         for (;;) {
-            POLL(rc, poll, pfds, POLLFDLEN - idle(), HEARTBEAT_DURATION);
+            POLL(rc, poll, pfds, POLLFDLEN - idle(), /*HEARTBEAT_DURATION*/-1);
+#if 0
             if (rc == 0) {
                 if (idle()) {
                     metrics.idle += HEARTBEAT_DURATION;
@@ -219,39 +235,46 @@ namespace sun {
                     }
                 }
             } else {
-                if (pfds[0].revents & POLLIN) {
-                    ev = msghub.retrieve();
-                    if (ev >= kNotifyLarge) {
-                        break;
-                    } else if (ev >= kNotifyMedium) {
-                        std::vector<Closure> t;
-                        mtx.lock();
-                        t.swap(closures);
-                        mtx.unlock();
-                        for (auto &&fn:t) {
-                            fn();
-                        }
-                    } else if (ev >= kNotifySmall) {
-                        w.write();
-                    }
-                }
-                if (state.load(std::memory_order_relaxed) == State::QUIT) {
+#endif
+            if (pfds[0].revents & POLLIN) {
+                ev = msghub.retrieve();
+                if (ev >= kNotifyLarge) {
                     break;
-                }
-                Defer switchstate;
-                if (pfds[1].revents & POLLIN) {
-                    onConnect();
-                    if (peerfd == -1) {
-                        continue;
+                } else if (ev >= kNotifyMedium) {
+                    std::vector<Closure> t;
+                    mtx.lock();
+                    t.swap(closures);
+                    mtx.unlock();
+                    for (auto &&fn:t) {
+                        fn();
                     }
-                    metrics.times++;
-                    pfds[2].fd = peerfd;
-                    switchstate = Defer([this] { onWork(); });
-                }
-                if (work() && (pfds[2].revents & POLLIN)) {
-                    r.read();
+                } else if (ev >= kNotifySmall) {
+                    w.write();
                 }
             }
+            if (getstate() == State::TERMINATED) {
+                break;
+            }
+            if (timer.getstate() == State::WORK && (pfds[1].revents & POLLIN)) {
+                Timer::OnTimeout(pfds[1].fd); /*notify*/
+                timer.post(tTask::Nil); /*action*/
+            }
+            Defer switchstate;
+            if (activepfd.revents & POLLIN) {
+                onConnect();
+                if (peerfd == -1) {
+                    continue;
+                }
+                metrics.times++;
+                positivepfd.fd = peerfd;
+                switchstate = Defer([this] { onWork(); });
+            }
+            if (work() && (positivepfd.revents & POLLIN)) {
+                r.read();
+            }
+#if 0
+            }
+#endif
         }
     }
 
@@ -270,9 +293,9 @@ namespace sun {
                 "hand",
                 "frozen",
         };
-        auto listener = reinterpret_cast<Listener *>(arg);
+        auto self = reinterpret_cast<Listener *>(arg);
         // STEP1,retrieve input
-        const auto &res = listener->r.msgreq;
+        const auto &res = self->r.msgreq;
         LOGINFO("input %d,%d", res.op, res.arg);
         // STEP2,do sth.
         if (++timeout == MAXTESTTIMEOUT) {
@@ -283,8 +306,31 @@ namespace sun {
         io::MsgResponse req(a[timeout], {9, 9, 6, 5});
         io::MsgRaw raw(io::MSGRESPONSE);
         raw.payload = req.pack();
-        listener->w.pub(raw.move());
-        listener->msghub.notify(kNotifySmall);
+        self->w.pub(raw.move(), self);
+        return arg;
+    }
+
+    void *Listener::tWork(void *) {
+        FUNCLOG("run per second");
+        return nullptr;
+    }
+
+    void *Listener::tWork2(void *) {
+        FUNCLOG("run every 2 seconds");
+        return nullptr;
+    }
+
+    void *Listener::Ping(void *arg) {
+        LOGINFO("@HEARTBEAT ping task");
+        auto self = reinterpret_cast<Listener *>(arg);
+        if (self->idle()) {
+            self->metrics.idle += HEARTBEAT_DURATION;
+        } else {
+            self->metrics.work += HEARTBEAT_DURATION;
+            if (!self->heartbeat.ping(self->peerfd, self)) {
+                self->onDisconnect();
+            }
+        }
         return arg;
     }
 }

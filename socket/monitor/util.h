@@ -18,6 +18,8 @@ namespace sun {
 
         int GetPid();
 
+        int GetTid();
+
         int Sleep(int ms);
 
         int NiceName(std::string &&name);
