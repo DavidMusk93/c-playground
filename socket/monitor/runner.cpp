@@ -5,12 +5,18 @@
 #include <sys/poll.h>
 
 namespace sun {
+    void *Task::kClosureTag = (void *) -1;
+
     void Task::run() const {
 #define CALL(fn, ...) if(fn){fn(__VA_ARGS__);}
         CALL(hook.oncall, arg);
         void *p{};
         try {
-            p = fn(arg);
+            if (arg == kClosureTag) {
+                closure();
+            } else {
+                p = fn(arg);
+            }
         } catch (std::exception &ex) {
             CALL(hook.onexception, ex);
         }
@@ -128,6 +134,10 @@ namespace sun {
                 if (task.type == TIMERTASK_REPEATED) {
                     task.runat = now + task.duration;
                     tasks_.push(task);
+                } else { /*drop once task*/
+                    if (task.dispose) {
+                        task.dispose(task.arg);
+                    }
                 }
             }
             if (tasks_.empty()) {

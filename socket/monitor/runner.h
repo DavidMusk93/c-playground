@@ -120,8 +120,10 @@ namespace sun {
 
         fn_job_t fn;
         void *arg;
-        TaskHook hook;
-//        std::function<void(void *)> dispose; /*use to free arg*/
+        std::function<void(void *)> dispose; /*use to free arg*/
+        Closure closure;
+        TaskHook hook; /*easy to use but each functor consumes 32 bytes*/
+        static void *kClosureTag;
     };
 
     class TaskRunner : public Runner {
@@ -155,10 +157,20 @@ namespace sun {
 
         tTask() : runat(-1), duration(0), type(-1) {}
 
-        tTask(unsigned duration, int type, fn_job_t fn, void *arg)
+        tTask(unsigned duration, int type, fn_job_t fn, void *arg, std::function<void(void *)> dispose = {})
                 : runat(util::Milliseconds() + duration),
                   duration(duration), type(type) {
             this->fn = fn, this->arg = arg;
+            if (dispose) {
+                this->dispose.swap(dispose);
+            }
+        }
+
+        tTask(unsigned duration, int type, Closure closure)
+                : runat(util::Milliseconds() + duration),
+                  duration(duration), type(type) {
+            arg = kClosureTag;
+            this->closure.swap(closure);
         }
 
         double runat;
