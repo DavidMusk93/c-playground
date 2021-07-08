@@ -9,6 +9,8 @@
 #include <condition_variable>
 #include <atomic>
 #include <memory>
+#include <unordered_set>
+#include <bitset>
 
 #include <unistd.h>
 #include <sys/eventfd.h>
@@ -17,6 +19,9 @@
 #include "state.h"
 #include "timer.h"
 #include "util.h"
+
+#define LOCKGUARD(x) std::lock_guard<std::mutex> _lg(x)
+#define UNIQUELOCK(x, ...) std::unique_lock<std::mutex> _ul(x,##__VA_ARGS__)
 
 namespace sun {
     class Terminator {
@@ -67,6 +72,44 @@ namespace sun {
         static constexpr const eventfd_t kNotifyOne = 1;
     };
 
+    template<size_t N>
+    class IdManager {
+    public:
+        IdManager() {
+            static_assert(N < 102400, "maximum id is too large");
+        }
+
+        int alloc() {
+            LOCKGUARD(mtx_);
+            for (size_t i = 0; i < N; ++i) {
+                if (!set_.test(i)) {
+                    set_.set(i);
+                    return (int) i;
+                }
+            }
+            return -1;
+        }
+
+        void dealloc(int id) {
+            if (id >= 0 && id < N) {
+                LOCKGUARD(mtx_);
+                set_.reset(id);
+            }
+        }
+
+        bool valid(int id) {
+            if (id >= 0 && id < N) {
+                LOCKGUARD(mtx_);
+                return set_.test(id);
+            }
+            return false;
+        }
+
+    private:
+        std::bitset<N> set_;
+        std::mutex mtx_;
+    };
+
     class Runner : public stateful {
     public:
 
@@ -114,10 +157,11 @@ namespace sun {
     typedef void *(*fn_job_t)(void *);
 
     struct Task {
-        Task() : fn{}, arg{} {}
+        Task() : id(-1), fn{}, arg{} {}
 
         void run() const;
 
+        mutable int id;
         fn_job_t fn;
         void *arg;
         std::function<void(void *)> dispose; /*use to free arg*/
@@ -141,8 +185,8 @@ namespace sun {
         void Run() override;
 
     private:
-/*        std::mutex &mtx_;
-        std::condition_variable &cond_;*/
+//        std::mutex &mtx_;
+//        std::condition_variable &cond_;
         std::deque<Task> tasks_;
         std::mutex mtx_;
     };
@@ -179,6 +223,8 @@ namespace sun {
 
         static tCmp Greater;
         static tTask Nil;
+        static constexpr const unsigned kTypeMask = 0xff;
+        static constexpr const unsigned kCancelMask = 0x100;
     };
 
 //    bool tTaskGreater(const tTask &t1, const tTask &t2);
@@ -187,11 +233,13 @@ namespace sun {
     public:
         using tHeap = std::priority_queue<tTask, std::deque<tTask>, tTask::tCmp>;
 
-        tRunner() : timer_({}), tasks_(tTask::Greater) {}
+        tRunner() : timer_({}), tasks_(tTask::Greater), id_(0) {}
 
         ~tRunner() override = default;
 
-        void post(const tTask &task);
+        int post(const tTask &task);
+
+        void cancel(int id);
 
         int fd() const {
             return timer_.fd();
@@ -203,7 +251,10 @@ namespace sun {
     private:
         Timer timer_;
         tHeap tasks_;
+        int id_;
+        std::unordered_set<int> marks_;
         std::mutex mtx_;
+        std::mutex mark_mtx_;
     };
 }
 

@@ -205,6 +205,7 @@ namespace sun {
     }
 
     void Listener::run() {
+        onIdle();
         worker.start();
         timer.start();
 #define POLLFDLEN 4
@@ -219,8 +220,14 @@ namespace sun {
         POLLFDSET(activepfd, activefd, POLLIN);
         POLLFDSET(positivepfd, peerfd, POLLIN);
         LOGINFO("timer state: %d", (int) timer.getstate());
-        timer.post({1000, TIMERTASK_REPEATED, tWork, nullptr}); /*timer test 1*/
-        timer.post({2000, TIMERTASK_REPEATED, tWork2, nullptr}); /*timer test 2*/
+        int id1 = timer.post({1000, TIMERTASK_REPEATED, tWork, nullptr}); /*timer test 1*/
+        int id2 = timer.post({2000, TIMERTASK_REPEATED, tWork2, nullptr}); /*timer test 2*/
+        timer.post(tTask(10 * 1000, TIMERTASK_ONCE, [] { LOGINFO("once task"); }));
+        timer.post(tTask(20 * 1000, TIMERTASK_ONCE, [id1, id2, this] {
+            LOGINFO("cancel tasks:%d,%d", id1, id2);
+            timer.cancel(id1);
+            timer.cancel(id2);
+        }));
         timer.post({HEARTBEAT_DURATION, TIMERTASK_REPEATED, Ping, this}); /*heartbeat*/
         for (;;) {
             POLL(rc, poll, pfds, POLLFDLEN - idle(), /*HEARTBEAT_DURATION*/-1);
@@ -256,7 +263,9 @@ namespace sun {
                 break;
             }
             if (timer.getstate() == State::WORK && (pfds[1].revents & POLLIN)) {
-                Timer::OnTimeout(pfds[1].fd); /*notify*/
+//                Timer::OnTimeout(pfds[1].fd); /*notify*/
+                unsigned long e;
+                read(pfds[1].fd, &e, sizeof e);
                 timer.post(tTask::Nil); /*action*/
             }
             Defer switchstate;

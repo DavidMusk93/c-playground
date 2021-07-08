@@ -72,11 +72,17 @@ namespace sun {
 
     tTask tTask::Nil(0, 0, nullptr, nullptr);
 
-    void tRunner::post(const tTask &task) {
-        if (task.fn) {
-            mtx_.lock();
-            tasks_.push(task);
-            mtx_.unlock();
+    int tRunner::post(const tTask &task) {
+        if (task.fn || task.closure) {
+            task.id = __sync_add_and_fetch(&id_, 1);
+            {
+                LOCKGUARD(mark_mtx_);
+                marks_.insert(task.id);
+            }
+            {
+                LOCKGUARD(mtx_);
+                tasks_.push(task);
+            }
             if (task.duration < Timer::kLeastDuration) { /*run immediately*/
                 notifier_.notify(Notifier::kNotifyOne);
             } else if (getstate() == State::IDLE) { /*the first task*/
@@ -93,8 +99,16 @@ namespace sun {
                     timer_.reset(Timer::Config{0, 0, 0, task.duration});
                 }
             }
-        } else { /*timeout*/
-            notifier_.notify(Notifier::kNotifyOne);
+            return task.id;
+        }
+        notifier_.notify(Notifier::kNotifyOne);
+        return -1;
+    }
+
+    void tRunner::cancel(int id) {
+        if (id > 0 && id < id_/*this constraint may be wrong*/) {
+            LOCKGUARD(mark_mtx_);
+            marks_.erase(id);
         }
     }
 
@@ -115,10 +129,21 @@ namespace sun {
             mtx_.lock();
             auto now = util::Milliseconds();
             tTask top;
+            bool alive;
             while (!tasks_.empty()) {
                 top = tasks_.top();
                 if (top.runat < now + Timer::kLeastDuration) {
-                    tasks.push_back(top);
+                    {
+                        LOCKGUARD(mark_mtx_);
+                        alive = marks_.count(top.id);
+                    }
+                    if (alive) {
+                        tasks.push_back(top);
+                    } else { /*the task is canceled, clear it*/
+                        if (top.dispose) {
+                            top.dispose(top.arg);
+                        }
+                    }
                     tasks_.pop();
                 } else {
                     break;
@@ -131,13 +156,15 @@ namespace sun {
             now = util::Milliseconds();
             std::unique_lock<std::mutex> ul(mtx_);
             for (auto &&task:tasks) {
-                if (task.type == TIMERTASK_REPEATED) {
+                if ((task.type & tTask::kTypeMask) == TIMERTASK_REPEATED) {
                     task.runat = now + task.duration;
                     tasks_.push(task);
                 } else { /*drop once task*/
                     if (task.dispose) {
                         task.dispose(task.arg);
                     }
+                    LOCKGUARD(mark_mtx_);
+                    marks_.erase(task.id);
                 }
             }
             if (tasks_.empty()) {
