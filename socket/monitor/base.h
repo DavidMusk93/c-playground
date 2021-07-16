@@ -114,6 +114,8 @@ namespace sun {
             return fd;
         }
 
+        virtual ~transferable() = default;
+
         int fd() const {
             return fd_;
         }

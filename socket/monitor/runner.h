@@ -54,6 +54,13 @@ namespace sun {
             fd_ = eventfd(0, flags);
         }
 
+        ~Notifier() override {
+            if (fd_ != -1) {
+                close(fd_);
+                fd_ = -1;
+            }
+        }
+
         void notify(eventfd_t event) {
             if (fd_ != -1) {
                 (void) write(fd_, &event, sizeof event);
@@ -124,7 +131,9 @@ namespace sun {
         }
 
         void start() {
-            setstate(State::INITIALIZED);
+            if (initialized()) {
+                return;
+            }
             runner_ = std::thread([this] { Run(); });
             while (getstate() != State::IDLE); /*wait for thread start*/
         }

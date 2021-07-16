@@ -58,7 +58,7 @@ namespace sun {
         double Milliseconds() {
             struct timespec ts{};
             clock_gettime(CLOCK_REALTIME, &ts);
-            return ts.tv_sec * kThousand + ts.tv_nsec / kMillion;
+            return (double) ts.tv_sec * kThousand + (double) ts.tv_nsec / kMillion;
         }
 
         bool ValidProcess(int pid) {
