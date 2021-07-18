@@ -60,12 +60,23 @@ if(error){\
 
 #define NL '\n'
 
-#ifdef __cplusplus
+#if defined(__cplusplus) || defined(CPPLOGSTYLE)
 #define __NULL nullptr
 #include "raii.h"
+
+#include <iostream>
+
+#undef LOG_INFO
+#define LOG_INFO(...) std::cout<<__VA_ARGS__<<std::endl
+#undef LOG_ERROR
+#define LOG_ERROR(...) std::cerr<<__VA_ARGS__<<std::endl
+
 #else
 #define __NULL NULL
 #endif
+
+#define LOGINFO LOG_INFO
+#define LOGERROR LOG_ERROR
 
 #define REVOKE_OUTPUT_BUFFER() \
 setbuf(stdout,__NULL);\
@@ -129,5 +140,50 @@ typedef double f64;
 #define __GCCATTR(x) __attribute__((x))
 #define GCCATTRCTOR __GCCATTR(constructor)
 #define GCCATTRCLEANUP(fn) __GCCATTR(__cleanup__(fn))
+
+#define _CAT(x, y) x##y
+#define _FIRST(_1, ...) _1
+#define _SECOND(_1, _2, ...) _2
+
+#define _IS_PROBE(...) _SECOND(__VA_ARGS__,0)
+#define _PROBE() ~,1
+
+#define _NOT(x) _IS_PROBE(_CAT(_NOT_,x))
+#define _NOT_0 _PROBE()
+#define _BOOL(x) _NOT(_NOT(x))
+
+#define _IF_ELSE(x) __IF_ELSE(_BOOL(x))
+#define __IF_ELSE(x) _CAT(_IF_,x)
+#define _IF_1(...) __VA_ARGS__ _IF_1_ELSE
+#define _IF_0(...) _IF_0_ELSE
+#define _IF_1_ELSE(...)
+#define _IF_0_ELSE(...) __VA_ARGS__
+
+#define EVAL(...) _EVAL1024(__VA_ARGS__)
+#define _EVAL1024(...) _EVAL512(_EVAL512(__VA_ARGS__))
+#define _EVAL512(...) _EVAL256(_EVAL256(__VA_ARGS__))
+#define _EVAL256(...) _EVAL128(_EVAL128(__VA_ARGS__))
+#define _EVAL128(...) _EVAL64(_EVAL64(__VA_ARGS__))
+#define _EVAL64(...) _EVAL32(_EVAL32(__VA_ARGS__))
+#define _EVAL32(...) _EVAL16(_EVAL16(__VA_ARGS__))
+#define _EVAL16(...) _EVAL8(_EVAL8(__VA_ARGS__))
+#define _EVAL8(...) _EVAL4(_EVAL4(__VA_ARGS__))
+#define _EVAL4(...) _EVAL2(_EVAL2(__VA_ARGS__))
+#define _EVAL2(...) _EVAL1(_EVAL1(__VA_ARGS__))
+#define _EVAL1(...) __VA_ARGS__
+
+#define _EMPTY()
+#define _DEFER1(x) x _EMPTY()
+#define _DEFER2(x) x _EMPTY _EMPTY()()
+
+#define _HAS_ARGS(...) _BOOL(_FIRST(_END_OF_ARGS __VA_ARGS__)())
+#define _END_OF_ARGS() 0
+
+#define MAP(op, x, ...)\
+op(x)\
+_IF_ELSE(_HAS_ARGS(__VA_ARGS__))(\
+  _DEFER2(_MAP)()(op,__VA_ARGS__)\
+)()
+#define _MAP() MAP /*avoid 'painted blue'*/
 
 #endif //C4FUN_MACRO_H
